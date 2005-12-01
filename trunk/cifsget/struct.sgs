@@ -1,0 +1,292 @@
+##ifndef STRUCT_H
+##define STRUCT_H
+
+type	byte	1
+type	sbyte	1
+
+type	word	2
+type	sword	2
+type	rword	2
+
+type	long	4
+type	slong	4
+type	rlong	4
+
+type 	quad	8
+type 	squad	8
+
+type 	nttime	8
+
+struct	packet
+	byte	type
+	byte	zero
+	rword 	length
+	rlong	magic
+	byte	command
+	long	status
+	byte	flags
+	word	flags2
+	word	pidh
+	quad	signature
+	word	unused
+	word	tid
+	word	pid
+	word	uid
+	word	mid
+	byte	wc
+	blob	w
+	word	bc
+	blob	b
+end	packet
+
+##define LEN_PACKET_W(base)		(GET_PACKET_WC(base)*2)
+##define SETLEN_PACKET_W(base, len) 	SET_PACKET_WC(base, (len+1)/2)
+
+##define LEN_PACKET_B(base)		GET_PACKET_BC(base)
+##define SETLEN_PACKET_B(base, len) 	SET_PACKET_BC(base, len)
+
+struct	inegot
+        word dialectindex
+        byte  securitymode
+        word maxmpxcount
+        word maxnumbervcs
+        long  maxbuffersize
+        long  maxrawsize
+        long  sessionkey
+        long  capabilities
+	nttime  systemtime
+        sword  servertimezone
+        byte  encryptionkeylength
+end	inegot
+
+struct	osessionsetup
+	long andx
+	word maxbuffersize
+	word maxmpxcount
+	word vcnumber
+	long  sessionkey
+	word ipwdlen
+	word pwdlen
+	long  reserved
+	long  capabilities
+end	osessionsetup
+
+
+struct	isessionsetup
+	long andx
+	word action
+end	isessionsetup
+
+struct	otreeconnect
+	long andx
+	word flags
+	word pwdlen
+end	otreeconnect
+
+struct	itreeconnect
+	long andx
+	word optionalsupport
+end	itreeconnect
+
+struct 	otrans
+	word total_param_count
+	word total_data_count
+	word max_param_count
+	word max_data_count
+	word max_setup_count
+	word flags
+	long timeout
+	word reserved
+	word param_count
+	word param_offset
+	word data_count
+	word data_offset
+	word setup_count
+	blob setup
+end 	otrans
+
+##define LEN_OTRANS_SETUP(base)		GET_OTRANS_SETUP_COUNT(base)*2
+##define SETLEN_OTRANS_SETUP(base, len) 	SET_OTRANS_SETUP_COUNT(base, len/2)
+
+struct 	otranss
+ 	word total_param_count
+ 	word total_data_count
+ 	word param_count
+ 	word param_offset
+ 	word param_displacement
+ 	word data_count
+ 	word data_offset
+ 	word data_displacement
+ 	word fid
+end 	otranss
+
+struct 	itranss
+	word total_param_count
+	word total_data_count
+	word reserved
+	word param_count
+	word param_offset
+	word param_displacement
+	word data_count
+	word data_offset
+	word data_displacement
+	word setup_count
+	blob setup
+end 	itranss
+
+##define LEN_ITRANSS_SETUP(base)		GET_ITRANSS_SETUP_COUNT(base)*2
+##define SETLEN_ITRANSS_SETUP(base, len)	SET_ITRANSS_SETUP_COUNT(base, len/2)
+
+struct	onttran
+	byte  max_setup_count
+	word reserved
+	long total_param_count
+	long total_data_count
+	long max_param_count
+	long max_data_count
+	long param_count
+	long param_offset
+ 	long data_count
+ 	long data_offset
+ 	byte  setup_count
+ 	word function
+ 	byte  buffer
+ 	word setup
+end	onttran
+
+
+struct	ofindfirst
+	word search_attributes
+	word search_count
+	word flags
+	word information_level
+	long search_storage_type
+	blob mask
+end	ofindfirst
+##define LEN_OFINDFIRST_MASK(base)	strlen(PTR_OFINDFIRST_MASK(base))+1
+
+struct	ifindfirst
+ 	word sid
+ 	word search_count
+ 	word end_of_search
+ 	word ea_error_offset
+ 	word last_name_offset
+end	ifindfirst	
+
+struct	ofindnext
+	word sid
+	word search_count
+	word information_level
+	long resume_key
+	word flags
+	blob mask
+end	ofindnext
+##define LEN_OFINDNEXT_MASK(base)	strlen(PTR_OFINDNEXT_MASK(base))+1
+
+struct 	ifindnext
+	word search_count
+	word end_of_search
+	word ea_error_offset
+	word last_name_offset
+end 	ifindnext
+
+struct 	dirinfo
+	long next_entry_offset
+	long file_index
+	nttime creation_time
+	nttime access_time
+	nttime write_time
+	nttime change_time
+	quad file_size
+	quad allocation_size
+	long attributes
+	long name_len
+	blob name
+end 	dirinfo
+##define LEN_DIRINFO_NAME(base)		GET_DIRINFO_NAME_LEN(base)
+##define SETLEN_DIRINFO_NAME(base, len)	SET_DIRINFO_NAME_LEN(base, len)
+
+struct 	rapenum
+	word status
+	word convert
+	word entry_count
+	word avail_count
+end	rapenum
+
+struct	shareenum
+	blob name
+	byte pad
+	word type
+	long comment
+end	shareenum
+##define LEN_SHAREENUM_NAME(base)	13
+
+struct	serverenum
+	blob name
+	byte major
+	byte minor
+	long type
+	long comment
+end serverenum
+##define LEN_SERVERENUM_NAME(base)	16
+
+struct 	oreadraw
+	word fid
+	long offset
+	word max_count
+	word min_count
+	long timeout
+	word reserved
+	long offset_high
+end	oreadraw
+
+struct 	oreadx
+	long andx
+	word fid
+	long offset
+	word max_count
+	word min_count
+	long reserved
+	word remaining
+	long offset_high
+end 	oreadx
+
+struct 	ireadx
+	long andx
+	word remaining
+	word datacompactionmode
+	word reserved
+	word data_count
+	word data_offset
+	word reserved1
+	word reserved2
+	word reserved3
+	word reserved4
+	word reserved5
+end	ireadx
+
+struct 	oclose
+	word fid
+	long last_write_time
+end 	oclose
+
+struct 	nbtheader
+	byte type
+	byte flags
+	rword length
+end 	nbtheader
+
+struct 	nbtsession
+	byte type
+	byte flags
+	rword length
+	byte dst_type
+	blob dst
+	byte src_type
+	blob src
+end 	nbtsession
+
+##define LEN_NBTSESSION_DST(base)	33
+##define LEN_NBTSESSION_SRC(base)	33
+
+##endif /* STRUCT_H */
