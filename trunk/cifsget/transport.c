@@ -264,6 +264,12 @@ int smb_recv(smb_connect_p c) {
 		return -1;
 	}
 	c->balance--;
+
+	/*do {
+		r = smb_recv_async(c);
+	} while (r == -1 && errno == EAGAIN);
+
+	return r;*/
 	
 	size = smb_recv_size(c);
 
@@ -321,4 +327,39 @@ int smb_request(smb_connect_p c) {
 		return -1;
 	}
 	return 0;
+}
+
+
+int smb_recv_async(smb_connect_p c) {
+	int size, type;
+	
+	if (c->recv_len == 0) {
+		c->recv_len = 4;
+		c->recv_done = 0;
+	}
+	
+	size = recv(c->sock, c->i + c->recv_done, c->recv_len - c->recv_done, MSG_DONTWAIT);
+	if (size < 0) return -1;
+	c->recv_done += size;
+	
+	if (c->recv_len == 4 && c->recv_done == 4) {
+		memcpy(&size, c->i, 4);
+		size = ntohl(size);
+		type = size >> 24;
+		size &= 0x0000FFFF; // FIXME
+		if (type) {
+			//FIXME: skip size bytes
+			c->recv_done = 0;
+		} else {			
+			c->recv_len += size;
+		}
+	}			
+
+	if (c->recv_len == c->recv_done) {
+		c->recv_len = 0;
+		return 0;
+	} else {	
+		errno = EAGAIN;
+		return -1;
+	}
 }

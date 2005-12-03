@@ -17,9 +17,9 @@ smb_connect_p smb_connect3(const char *server, const char *share);
 int smb_open(smb_connect_p c, const char *name, int mode);
 int smb_close(smb_connect_p c, int fid);
 
-size_t smb_read_send(smb_connect_p c, int fid, size_t size, uint64_t offset);
-size_t smb_read_recv(smb_connect_p c, void *buf, size_t size);
-	
+int smb_read_send(smb_connect_p c, int fid, size_t size, uint64_t offset);
+size_t smb_read_get(smb_connect_p c, void **buf);
+size_t smb_read_recv(smb_connect_p c, void *buf, size_t size);	
 size_t smb_read(smb_connect_p c, int fid, void *buf, size_t count, uint64_t offset);
 
 #endif /* PROTO_H */

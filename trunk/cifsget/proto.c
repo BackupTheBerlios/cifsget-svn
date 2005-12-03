@@ -188,7 +188,8 @@ int smb_close(smb_connect_p c, int fid) {
 	return 0;
 }
 
-int smb_read_andx_send(smb_connect_p c, int fid, int count, uint64_t offset) {
+
+static int smb_read_andx_send(smb_connect_p c, int fid, int count, uint64_t offset) {
 	char *o = c->o, *w;
 	
 	if (count > c->max_buffer_size) count = c->max_buffer_size; //FIXME
@@ -211,30 +212,7 @@ int smb_read_andx_send(smb_connect_p c, int fid, int count, uint64_t offset) {
 	return smb_send(c);
 }
 
-int smb_read_andx_recv(smb_connect_p c, void *buf, int count) {
-	char *w;
-	int len, off;
-	if (smb_recv(c)) return -1;
-	w = PTR_PACKET_W(c->i);
-#ifdef DEBUG
-	PRINT_STRUCT(w, IREADX);
-#endif
-	len = GET_IREADX_DATA_COUNT(w);
-	if (len > count) {
-		errno = EIO;
-		return -1;
-	}
-	off = GET_IREADX_DATA_OFFSET(w);
-	memcpy(buf, PTR_PACKET_MAGIC(c->i) + off, len);
-	return len;
-}
-
-int smb_read_andx(smb_connect_p c, int fid, void *buf, int count, uint64_t offset) {
-	if (smb_read_andx_send(c, fid, count, offset)) return -1;
-	return smb_read_andx_recv(c, buf, count);
-}
-
-int smb_read_raw_send(smb_connect_p c, int fid, int count, uint64_t offset) {
+static int smb_read_raw_send(smb_connect_p c, int fid, int count, uint64_t offset) {
 	char *o = c->o, *w;
 	if (count > c->max_raw_size) count = c->max_raw_size;
 	SET_PACKET_COMMAND(o, SMBreadbraw);
@@ -254,16 +232,53 @@ int smb_read_raw_send(smb_connect_p c, int fid, int count, uint64_t offset) {
 	return smb_send(c);
 }
 
-int smb_read_raw(smb_connect_p c, int fid, void *buf, int count, uint64_t offset) {
-	if (smb_read_raw_send(c, fid, count, offset)) return -1;
-	return smb_recv_raw(c, buf, count);
+static size_t smb_read_andx_get(smb_connect_p c, void **buf) {
+	char *w;
+	int len, off;
+	w = PTR_PACKET_W(c->i);
+#ifdef DEBUG
+	PRINT_STRUCT(w, IREADX);
+#endif
+	len = GET_IREADX_DATA_COUNT(w);
+	off = GET_IREADX_DATA_OFFSET(w);
+	*buf = PTR_PACKET_MAGIC(c->i) + off;
+	return len;
 }
 
-size_t smb_read_send(smb_connect_p c, int fid, size_t count, uint64_t offset) {
+static size_t smb_read_raw_get(smb_connect_p c, void **buf) {
+	int len;
+	len = GET_PACKET_LENGTH(c->i);
+	*buf = PTR_PACKET_MAGIC(c->i);
+	return len;
+}
+
+static size_t smb_read_andx_recv(smb_connect_p c, void *buf, size_t count) {
+	int len;
+	void *src;
+	if (smb_recv(c)) return -1;
+	len = smb_read_andx_get(c, &src);
+	if (len < 0) return -1;
+	if (len > count) {
+		errno = ENOMEM;
+		return -1;
+	}
+	memcpy(buf, src, len);
+	return len;
+}
+
+int smb_read_send(smb_connect_p c, int fid, size_t count, uint64_t offset) {
 	if (c->capabilities & CAP_RAW_MODE) {
 		return smb_read_raw_send(c, fid, count, offset);
 	} else {
 		return smb_read_andx_send(c, fid, count, offset);
+	}
+}
+
+size_t smb_read_get(smb_connect_p c, void **buf) {
+	if (c->capabilities & CAP_RAW_MODE) {
+		return smb_read_raw_get(c, buf);
+	} else {
+		return smb_read_andx_get(c, buf);
 	}
 }
 
@@ -278,12 +293,12 @@ size_t smb_read_recv(smb_connect_p c, void *buf, size_t count) {
 size_t smb_read(smb_connect_p c, int fid, void *buf, size_t count, uint64_t offset) {
 	int res;
 	if (c->capabilities & CAP_RAW_MODE) {
-		res = smb_read_raw(c, fid, buf, count, offset);
-		if (res == 0) res = smb_read_andx(c, fid, buf, count, offset);
-		return res;
-	} else {
-		return smb_read_andx(c, fid, buf, count, offset);
+		if (smb_read_raw_send(c, fid, count, offset)) return -1;
+		res = smb_recv_raw(c, buf, count);
+		if (res != 0) return res;
 	}
+	if (smb_read_andx_send(c, fid, count, offset)) return -1;
+	return smb_read_andx_recv(c, buf, count);
 }
 
 smb_connect_p smb_connect2(const char *server) {

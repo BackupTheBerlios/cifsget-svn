@@ -7,6 +7,10 @@ typedef struct smb_connect_s {
 	int sock;
 	char *i, *o;
 	
+	/* async recv routine*/
+	int recv_len;
+	int recv_done;
+	
 	int session_key;
 	int max_buffer_size;
 	int max_raw_size;
@@ -24,6 +28,7 @@ int smb_connected(smb_connect_p c);
 
 int smb_send(smb_connect_p c);
 int smb_recv(smb_connect_p c);
+int smb_recv_async(smb_connect_p c);
 int smb_recv_more(smb_connect_p c);
 
 size_t smb_send_raw(smb_connect_p c, void *buf, size_t len);
