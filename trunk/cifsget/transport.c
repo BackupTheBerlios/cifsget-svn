@@ -6,15 +6,11 @@
 #endif
 #endif
 
-static int smb_check_packet(char *p) {
-	int size;
-	size = GET_PACKET_LENGTH(p) + 4;
-	if ((size < 39) || (GET_PACKET_MAGIC(p) != SMB_MAGIC) ||
-			(size < 39 + 2*GET_PACKET_WC(p)) ||
-			(size < 39 + 2*GET_PACKET_WC(p) + GET_PACKET_BC(p) )
-	   ) {
-		return -1;
-	}
+static int smb_check_packet(char *p, int size) {
+	if (size < OFF_PACKET_WC(p) + LEN_PACKET_WC(p)) return -1;
+	if (GET_PACKET_MAGIC(p) != SMB_MAGIC) return -1;
+	if (size < OFF_PACKET_BC(p) + LEN_PACKET_BC(p)) return -1;
+	if (size < LEN_PACKET(p)) return -1;
 	return 0;
 }
 
@@ -99,7 +95,8 @@ smb_connect_p smb_connect(const char *server) {
 	
 	c->connected = 1;
 	c->sock = sock;
-	c->i = malloc(SMB_MAX_BUFFER + 4);
+	c->i_size = SMB_MAX_BUFFER + 4;
+	c->i = malloc(c->i_size);
 	c->o = malloc(SMB_MAX_BUFFER + 4);
 
 	return c;
@@ -137,16 +134,11 @@ size_t smb_send_raw(smb_connect_p c, void *buf, size_t len) {
 
 int smb_send(smb_connect_p c) {
 	int len, r;
-	char *p;
-	
-	if (c->balance != 0) {
-		smb_dump_msg("smb_send: packet disbalance %d\n", c->balance);
-		return -1;
-	}
-	c->balance++;
+	char *p;	
 	
 	len = LEN_PACKET(c->o);
 	SET_PACKET_LENGTH(c->o, len - 4);
+	
 #ifdef SMB_DUMP_PACKET
 	smb_dump_packet("send", c->o);
 #endif
@@ -206,20 +198,13 @@ int smb_recv_size(smb_connect_p c) {
 			smb_recv_skip(c, size);
 		}
 	} while (type);
-	return size ;
+	return size;
 }
 
 size_t smb_recv_raw(smb_connect_p c, void *buf, size_t len) {
 	int size;
 	int r, l;
 	char *p;
-
-	if (c->balance != 1) {
-		smb_dump_msg("smb_recv_raw: packet disbalance %d\n", c->balance);
-		c->connected = 0;
-		return -1;
-	}
-	c->balance--;
 
 	size = smb_recv_size(c);
 
@@ -230,8 +215,7 @@ size_t smb_recv_raw(smb_connect_p c, void *buf, size_t len) {
 	if (size > len) {
 		smb_dump_msg("smb_recv_raw: buffer to small %d packet size %d\n", len, size);
 		smb_recv_skip(c, size);
-		errno = ENOMEM;
-		c->connected = 0;
+		errno = ENOMEM;		
 		return -1;
 	}
 	
@@ -255,43 +239,37 @@ size_t smb_recv_raw(smb_connect_p c, void *buf, size_t len) {
 
 int smb_recv(smb_connect_p c) {
 	int size;
-	int r;
-	char *p;
 
-	if (c->balance != 1) {
-		smb_dump_msg("smb_recv: packet disbalance %d\n", c->balance);
-		c->connected = 0;
-		return -1;
-	}
-	c->balance--;
-
-	/*do {
-		r = smb_recv_async(c);
-	} while (r == -1 && errno == EAGAIN);
-
-	return r;*/
+	c->i_len = 4;
+	c->i_done = 0;
 	
-	size = smb_recv_size(c);
-
-	SET_PACKET_LENGTH(c->i, size);
-
-	p = PTR_PACKET_MAGIC(c->i);
-	
-	while (size) {
-		r = recv(c->sock, p, size, MSG_WAITALL);
-		if (r < 0) {
+	do {
+		size = recv(c->sock, c->i + c->i_done, c->i_len - c->i_done, MSG_WAITALL);
+		if (size < 0) {
 			c->connected = 0;
 			return -1;
 		}
-		size -= r;
-		p += r;
-	}
+		c->i_done += size;
+		if (c->i_done == 4 && c->i_len == 4) {
+			size = GET_PACKET_LENGTH(c->i);
+			if (GET_PACKET_TYPE(c->i)) {
+				smb_recv_skip(c, size);
+				c->i_done = 0;
+			} else {
+				c->i_len += size;
+				if (c->i_len > c->i_size) {
+					smb_recv_skip(c, size);
+					errno = ENOMEM;
+					return -1;
+				}
+			}
+		}
+	} while (c->i_len != c->i_done);	
 	
-	if (smb_check_packet(c->i)) {
+	if (smb_check_packet(c->i, c->i_len)) {
 #ifdef SMB_DUMP_FATAL
-		smb_dump_buf("incorect packet", c->i, GET_PACKET_LENGTH(c->i) + 4);
+		smb_dump_buf("incorect packet", c->i, c->i_len);
 #endif
-		c->connected = 0;
 		errno = EIO;
 		return -1;
 	}
@@ -304,10 +282,8 @@ int smb_recv(smb_connect_p c) {
 
 
 int smb_recv_more(smb_connect_p c) {
-	c->balance++;
 	return smb_recv(c);
 }
-
 
 int smb_request(smb_connect_p c) {
 	if (smb_send(c)) return -1;
@@ -319,7 +295,6 @@ int smb_request(smb_connect_p c) {
 		smb_dump_packet("o", c->o);
 #endif
 		errno = EIO;
-		c->connected = 0;
 		return -1;
 	}
 	if (GET_PACKET_STATUS(c->i)) {
@@ -333,33 +308,42 @@ int smb_request(smb_connect_p c) {
 int smb_recv_async(smb_connect_p c) {
 	int size, type;
 	
-	if (c->recv_len == 0) {
-		c->recv_len = 4;
-		c->recv_done = 0;
+	/* stage1: try recv size field */
+	if (c->i_len == c->i_done) {
+		c->i_len = 4;
+		c->i_done = 0;
 	}
 	
-	size = recv(c->sock, c->i + c->recv_done, c->recv_len - c->recv_done, MSG_DONTWAIT);
+	if (c->i_done > 0) {
+		size = recv(c->sock, c->i + c->i_done, c->i_len - c->i_done, MSG_DONTWAIT);
+	} else {
+		size = -c->i_done;
+		if (size > c->i_size) size = c->i_size;
+		size = recv(c->sock, c->i, size, MSG_DONTWAIT);
+	}
 	if (size < 0) return -1;
-	c->recv_done += size;
+	c->i_done += size;
 	
-	if (c->recv_len == 4 && c->recv_done == 4) {
-		memcpy(&size, c->i, 4);
-		size = ntohl(size);
-		type = size >> 24;
-		size &= 0x0000FFFF; // FIXME
+	/* stage2: recv size finished */
+	if (c->i_len == 4 && c->i_done == 4) {
+		size = GET_PACKET_LENGTH(c->i);
+		type = GET_PACKET_TYPE(c->i);
 		if (type) {
-			//FIXME: skip size bytes
-			c->recv_done = 0;
-		} else {			
-			c->recv_len += size;
+			/* skip size bytes */
+			c->i_done = -size;
+		} else {
+			/* recv body */
+			c->i_len += size;
+			if (c->i_len > c->i_size) {
+				errno = ENOMEM;
+				return -1;
+			}
 		}
-	}			
-
-	if (c->recv_len == c->recv_done) {
-		c->recv_len = 0;
-		return 0;
-	} else {	
-		errno = EAGAIN;
-		return -1;
 	}
+
+	if (c->i_done == c->i_len) return 0;
+	
+	errno = EAGAIN;
+	return -1;	
 }
+

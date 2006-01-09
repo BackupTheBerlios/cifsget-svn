@@ -55,6 +55,7 @@
 #include "uri.h"
 #include "codepage.h"
 #include "flow.h"
+#include "mirror.h"
 
 #endif /* INCLUDES_H */
 

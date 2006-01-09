@@ -12,6 +12,9 @@ char *smb_nttime2unix_str(int64_t nttime) {
 int smb_negotiate(smb_connect_p c) {
 	char *o=c->o, *p;
 
+	SET_PACKET_TYPE(o, 0);
+	SET_PACKET_ZERO(o, 0);
+
 	SET_PACKET_MAGIC(o, SMB_MAGIC);
 	SET_PACKET_COMMAND(o, SMBnegprot);
 	SET_PACKET_STATUS(o, 0);

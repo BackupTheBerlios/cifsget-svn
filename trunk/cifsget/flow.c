@@ -1,53 +1,67 @@
 #include "includes.h"
 
-int smb_flow_init(smb_flow_p f, int limit) {
-	ZERO_STRUCTP(f);
-	f->limit = limit;
-	gettimeofday(&f->point, NULL);
-	memcpy(&f->point1, &f->point, sizeof(struct timeval));
-	return 0;
-}
+#define DEFAULT_INTERVAL 500000
 
-static void smb_sleep(double time) {
+static void smb_sleep(uint64_t time) {
 	struct timespec tm;
-	tm.tv_sec = time;
-	tm.tv_nsec = (time - tm.tv_sec) * 1000000000.0 + 1;
+	tm.tv_sec = time/1000000;
+	tm.tv_nsec = time%1000000*1000+999;
 	while (nanosleep(&tm, &tm) && errno == EINTR);
 }
 
-int smb_flow(smb_flow_p f, int delta) {
+static uint64_t smb_gettime(void) {
 	struct timeval cur;
-	double t, x, w;
-	f->total += delta;
 	gettimeofday(&cur, NULL);
-	
-	f->delta += delta;
-	f->delta1 += delta;
+	return (uint64_t)cur.tv_sec * 1000000 + cur.tv_usec;
+}
 
-	x = f->delta;
-	
-	t = (cur.tv_sec - f->point.tv_sec) + 
-		((double)(cur.tv_usec - f->point.tv_usec))/1000000.0;
+smb_flow_p smb_flow_new(void) {
+	smb_flow_p f;
+	NEW_STRUCT(f);
+	f->interval = DEFAULT_INTERVAL;
+	f->start = smb_gettime();
+	f->a = f->b = f->c = f->start;
+	return f;
+}
 
-	/*x = f->delta - f->delta1;
+int smb_flow(smb_flow_p f, int delta) {
+	uint64_t t, x, w;
 	
-	t = (f->point1.tv_sec - f->point.tv_sec) + 
-		((double)(f->point1.tv_usec - f->point.tv_usec))/1000000.0;*/
+	f->total += delta;	
+	f->d += delta;
+	f->e += delta;
 
-	if (cur.tv_sec - f->point1.tv_sec > 1) {
-		f->delta = f->delta1;
-		f->delta1 = 0;
-		memcpy(&f->point, &f->point1, sizeof(struct timeval));
-		memcpy(&f->point1, &cur, sizeof(struct timeval));
+	x = (uint64_t)f->d * 1000000;
+
+	f->c = smb_gettime();
+
+	f->time = (f->c - f->start) / 1000000;
+	
+	t = f->c - f->a;
+
+	if (f->c - f->b > f->interval) {
+		f->d = f->e;
+		f->e = 0;
+		f->a = f->b;
+		f->b = f->c;
 	}
 
-	f->speed = x / t;
+	if (t > 0) {
+		f->speed = x / t;
+	} else {
+		f->speed = 0;
+	}
 
 	if (f->limit > 0) {
-		w = x / f->limit - t;
-		if (w > 0) smb_sleep(w);
+		w = x / f->limit;
+		if (w > t) smb_sleep(w - t);
 	}
+	
+	if (f->e == 0) return 1;
 	
 	return 0;
 }
 
+void smb_flow_free(smb_flow_p f) {
+	free(f);
+}

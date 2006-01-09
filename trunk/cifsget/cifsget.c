@@ -13,7 +13,7 @@ void usage() {
 	exit(2);
 }
 
-smb_flow_t flow;
+smb_flow_p flow;
 
 int smb_download(smb_connect_p c, smb_dirinfo_p di, const char *src, const char *dst, char *lname);
 
@@ -111,18 +111,20 @@ int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const 
 			off += res;
 			rem -= res;
 			if (write(fd, buf, res) != res)	goto err;
-			smb_flow(&flow, res);
+			
 		}
-		printf("%6s  ", human_file_size(off));
-		printf("done: %.1f%%  ", (double)off * 100.0 / di->file_size);
-		printf("tolal: %s  ", human_file_size(flow.total));
-		printf("speed: %s/s  ", human_file_size(flow.speed));
-		if (flow.speed) {
-			printf("ETA: %s          \r", human_time((di->file_size - off) / flow.speed));
-		} else {
+		if (smb_flow(flow, res)) {
+			printf("%6s of ", human_file_size(off));
+			printf("%6s ", human_file_size(di->file_size));
+			printf("(%.1f%%) ", (double)off * 100.0 / di->file_size);			
+			printf("%6s/s ", human_file_size(flow->speed));
+			if (flow->speed > 0) {
+				printf("ETA: %s ", human_time((di->file_size - off) / flow->speed));
+			}
+			//printf("tolal: %s - %s ", human_file_size(flow.total), human_time(flow.time));
 			printf("\r");
+			fflush(stdout);
 		}
-		fflush(stdout);		
 	}	
 	printf("                                                                    \r");
 	
@@ -131,7 +133,7 @@ int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const 
 	return 0;
 
 err:
-	perror(dst);	
+	perror(dst);
 	if (fd >= 0) close(fd);
 	if (fid >= 0) smb_close(c, fid);
 	return -1;
@@ -294,7 +296,7 @@ int main(int argc, char * const argv[]) {
 
 	action = 'd';
 
-	smb_flow_init(&flow, 0);
+	flow = smb_flow_new();
 
 	for (int i = 1 ; i<argc ; i++) {
 		if (!strcmp(argv[i], "-l")) {
@@ -307,7 +309,7 @@ int main(int argc, char * const argv[]) {
 				fprintf(stderr, "-s: parameter needed\n");
 				break;
 			}
-			flow.limit = from_human_file_size(argv[i]);
+			flow->limit = from_human_file_size(argv[i]);
 		} else if (!strcmp(argv[i], "-o")) {
 			i++;
 			if (i == argc) {

@@ -5,19 +5,19 @@
 
 typedef struct smb_connect_s {
 	int sock;
+	/* I/O buffers*/
 	char *i, *o;
 	
-	/* async recv routine*/
-	int recv_len;
-	int recv_done;
+	/* async I/O routine*/
+	int i_size, i_len, i_done;
+	int o_size, o_len, o_done;
 	
 	int session_key;
 	int max_buffer_size;
 	int max_raw_size;
 	int capabilities;
-	int server_time_zone;
-	
-	int balance;
+	int server_time_zone;	
+
 	int connected;
 } smb_connect_t;
 typedef smb_connect_t *smb_connect_p;

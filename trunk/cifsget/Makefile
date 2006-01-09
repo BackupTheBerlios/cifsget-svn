@@ -1,5 +1,5 @@
 CFLAGS=-g -std=c99 -Wall
-OBJECTS=transport.o proto.o codepage.o uri.o transact.o find.o rap.o flow.o
+OBJECTS=transport.o proto.o codepage.o uri.o transact.o find.o rap.o flow.o mirror.o
 PREFIX=${HOME}
 
 ifdef WINDOWS
@@ -30,6 +30,9 @@ struct.h: struct.sgs sgs
 
 ${TARGET}: cifsget.o ${OBJECTS}
 	${CC} -o $@ $^ ${LDFLAGS}
+
+cifsmirror: cifsmirror.o ${OBJECTS}
+	${CC} -o $@ $^ ${LDFLAGS}	
 	
 clean:
 	rm -f *.o ${TARGET} tags fusesmb .depends
