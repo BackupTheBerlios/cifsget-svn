@@ -75,10 +75,10 @@ int smb_info(smb_connect_p c, const char *name, smb_dirinfo_p d) {
 		smb_trans_free(&t);
 		return -1;	
 	}	
-#ifdef DEBUG
-		smb_dump_trans("info", &t);
-		PRINT_STRUCT(t.param, IFINDFIRST);
-#endif
+
+		smb_log_trans("info", &t);
+		smb_log_struct(t.param, IFINDFIRST);
+
 	if (GET_IFINDFIRST_SEARCH_COUNT(t.param) != 1) {
 		smb_trans_free(&t);
 		if (!GET_IFINDFIRST_END_OF_SEARCH(t.param)) {
@@ -104,10 +104,10 @@ int smb_find_first(smb_connect_p c, smb_find_p f, const char *mask) {
 		return -1;
 	}
 
-#ifdef DEBUG
-	smb_dump_trans("findfirst", &f->t);
-	PRINT_STRUCT(f->t.param, IFINDFIRST);
-#endif
+
+	smb_log_trans("findfirst", &f->t);
+	smb_log_struct(f->t.param, IFINDFIRST);
+
 
 	f->end = GET_IFINDFIRST_END_OF_SEARCH(f->t.param);
 	f->sid = GET_IFINDFIRST_SID(f->t.param);
@@ -126,10 +126,10 @@ loop:
 		if (smb_send(c)) return -1;
 		if (smb_trans_recv(c, &f->t)) return -1;
 
-#ifdef DEBUG
-		smb_dump_trans("findnext", &f->t);
-		PRINT_STRUCT(f->t.param, IFINDNEXT);
-#endif
+
+		smb_log_trans("findnext", &f->t);
+		smb_log_struct(f->t.param, IFINDNEXT);
+
 		f->end = GET_IFINDNEXT_END_OF_SEARCH(f->t.param);
 		f->cur = f->t.data;
 		f->count = GET_IFINDNEXT_SEARCH_COUNT(f->t.param);

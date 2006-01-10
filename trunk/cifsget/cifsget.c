@@ -9,73 +9,14 @@ void usage() {
   \n\
   -l                    list\n\
   -o name		write to file or dir name, instead of original name\n\
-  -s <int>[k|m|g|t]     limit download speed\n");
+  -s <int>[k|m|g|t]     limit download speed\n\
+  -d <int>		log level");
 	exit(2);
 }
 
 smb_flow_p flow;
 
 int smb_download(smb_connect_p c, smb_dirinfo_p di, const char *src, const char *dst, char *lname);
-
-const char *human_file_size(long long int size) {
-	static char buf[64];
-	double s = size;
-	static const double t = 1000.0;
-	static const double p = 1024.0;
-	if (s > t*p*p*p) {
-		sprintf(buf, "%.1ft", s / (p*p*p*p));
-	} else if (s > t*p*p) {
-		sprintf(buf, "%.1fg", s / (p*p*p));
-	} else if (s > t*p) {
-		sprintf(buf, "%.1fm", s / (p*p));
-	} else if (s > t) {
-		sprintf(buf, "%.1fk", s / p);
-	} else {
-		sprintf(buf, "%.0fb", s);
-	}
-	return buf;
-}
-
-long long int from_human_file_size(const char *s) {
-	long long int x;
-	char *p;
-	x = strtol(s, &p, 10);
-	switch (*p) {
-		case 't':
-		case 'T':
-			x *= 1024;
-		case 'g':
-		case 'G':
-			x *= 1024;
-		case 'm':
-		case 'M':
-			x *= 1024;
-		case 'k':
-		case 'K':
-			x *= 1024;
-	}
-	p++;
-	if (*p == 'b' || *p == 'B') p++;
-	if (*p != '\0') return -1;
-	return x;
-}
-
-const char *human_time(int time) {
-	static char buf[64];
-	int d, h, m, s;
-	d = time / 86400;
-	h = time / 3600 % 24;
-	m = time / 60 % 60;
-	s = time % 60;
-	if (d) {
-		sprintf(buf, "%d days %02d:%02d:%02d", d, h, m, s);
-	} else if (h) {
-		sprintf(buf, "%02d:%02d:%02d", h, m, s);
-	} else {
-		sprintf(buf, "%02d:%02d", m, s);
-	}
-	return buf;
-}
 
 void smb_print_file(smb_dirinfo_p di, const char *name) {
 	if (di->attributes & FILE_ATTRIBUTE_DIRECTORY) {
@@ -116,7 +57,7 @@ int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const 
 		if (smb_flow(flow, res)) {
 			printf("%6s of ", human_file_size(off));
 			printf("%6s ", human_file_size(di->file_size));
-			printf("(%.1f%%) ", (double)off * 100.0 / di->file_size);			
+			printf("(%.1f%%) ", (double)off * 100.0 / di->file_size);
 			printf("%6s/s ", human_file_size(flow->speed));
 			if (flow->speed > 0) {
 				printf("ETA: %s ", human_time((di->file_size - off) / flow->speed));
@@ -240,7 +181,7 @@ int smb_list_node(const char *host) {
 	c = smb_connect3(host, "IPC$");	
 	
 	if (!c) {
-		perror("connect");
+		perror(host);
 		return -1;
 	}
 	
@@ -326,7 +267,7 @@ int main(int argc, char * const argv[]) {
 reconnect:
 				c = smb_connect3(uri.host, uri.share);
 				if (!c) {
-					perror("connect");
+					perror(uri.host);
 					continue;
 				}
 				if (uri.file) {

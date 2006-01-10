@@ -95,25 +95,27 @@
 #define END_PACKET_B(base, end) SETLEN_PACKET_B(base, end - GET_PACKET_B(base))
 #define LEN_PACKET(base) 39  + LEN_PACKET_W(base) + LEN_PACKET_B(base)
 #define ITR_PACKET(base, macro)\
-macro(type, BYTE, GET_PACKET_TYPE(base), LEN_PACKET_TYPE(base))\
-macro(zero, BYTE, GET_PACKET_ZERO(base), LEN_PACKET_ZERO(base))\
-macro(length, RWORD, GET_PACKET_LENGTH(base), LEN_PACKET_LENGTH(base))\
-macro(magic, RLONG, GET_PACKET_MAGIC(base), LEN_PACKET_MAGIC(base))\
-macro(command, BYTE, GET_PACKET_COMMAND(base), LEN_PACKET_COMMAND(base))\
-macro(status, LONG, GET_PACKET_STATUS(base), LEN_PACKET_STATUS(base))\
-macro(flags, BYTE, GET_PACKET_FLAGS(base), LEN_PACKET_FLAGS(base))\
-macro(flags2, WORD, GET_PACKET_FLAGS2(base), LEN_PACKET_FLAGS2(base))\
-macro(pidh, WORD, GET_PACKET_PIDH(base), LEN_PACKET_PIDH(base))\
-macro(signature, QUAD, GET_PACKET_SIGNATURE(base), LEN_PACKET_SIGNATURE(base))\
-macro(unused, WORD, GET_PACKET_UNUSED(base), LEN_PACKET_UNUSED(base))\
-macro(tid, WORD, GET_PACKET_TID(base), LEN_PACKET_TID(base))\
-macro(pid, WORD, GET_PACKET_PID(base), LEN_PACKET_PID(base))\
-macro(uid, WORD, GET_PACKET_UID(base), LEN_PACKET_UID(base))\
-macro(mid, WORD, GET_PACKET_MID(base), LEN_PACKET_MID(base))\
-macro(wc, BYTE, GET_PACKET_WC(base), LEN_PACKET_WC(base))\
-macro(w, BLOB, GET_PACKET_W(base), LEN_PACKET_W(base))\
-macro(bc, WORD, GET_PACKET_BC(base), LEN_PACKET_BC(base))\
-macro(b, BLOB, GET_PACKET_B(base), LEN_PACKET_B(base))\
+do {\
+macro(type, BYTE, GET_PACKET_TYPE(base), LEN_PACKET_TYPE(base));\
+macro(zero, BYTE, GET_PACKET_ZERO(base), LEN_PACKET_ZERO(base));\
+macro(length, RWORD, GET_PACKET_LENGTH(base), LEN_PACKET_LENGTH(base));\
+macro(magic, RLONG, GET_PACKET_MAGIC(base), LEN_PACKET_MAGIC(base));\
+macro(command, BYTE, GET_PACKET_COMMAND(base), LEN_PACKET_COMMAND(base));\
+macro(status, LONG, GET_PACKET_STATUS(base), LEN_PACKET_STATUS(base));\
+macro(flags, BYTE, GET_PACKET_FLAGS(base), LEN_PACKET_FLAGS(base));\
+macro(flags2, WORD, GET_PACKET_FLAGS2(base), LEN_PACKET_FLAGS2(base));\
+macro(pidh, WORD, GET_PACKET_PIDH(base), LEN_PACKET_PIDH(base));\
+macro(signature, QUAD, GET_PACKET_SIGNATURE(base), LEN_PACKET_SIGNATURE(base));\
+macro(unused, WORD, GET_PACKET_UNUSED(base), LEN_PACKET_UNUSED(base));\
+macro(tid, WORD, GET_PACKET_TID(base), LEN_PACKET_TID(base));\
+macro(pid, WORD, GET_PACKET_PID(base), LEN_PACKET_PID(base));\
+macro(uid, WORD, GET_PACKET_UID(base), LEN_PACKET_UID(base));\
+macro(mid, WORD, GET_PACKET_MID(base), LEN_PACKET_MID(base));\
+macro(wc, BYTE, GET_PACKET_WC(base), LEN_PACKET_WC(base));\
+macro(w, BLOB, GET_PACKET_W(base), LEN_PACKET_W(base));\
+macro(bc, WORD, GET_PACKET_BC(base), LEN_PACKET_BC(base));\
+macro(b, BLOB, GET_PACKET_B(base), LEN_PACKET_B(base));\
+} while(0)
 
 #define LEN_PACKET_W(base)		(GET_PACKET_WC(base)*2)
 #define SETLEN_PACKET_W(base, len) 	SET_PACKET_WC(base, (len+1)/2)
@@ -176,17 +178,19 @@ macro(b, BLOB, GET_PACKET_B(base), LEN_PACKET_B(base))\
 #define SET_INEGOT_ENCRYPTIONKEYLENGTH(base, val) SET_BYTE(base, OFF_INEGOT_ENCRYPTIONKEYLENGTH(base), val)
 #define LEN_INEGOT(base) 34 
 #define ITR_INEGOT(base, macro)\
-macro(dialectindex, WORD, GET_INEGOT_DIALECTINDEX(base), LEN_INEGOT_DIALECTINDEX(base))\
-macro(securitymode, BYTE, GET_INEGOT_SECURITYMODE(base), LEN_INEGOT_SECURITYMODE(base))\
-macro(maxmpxcount, WORD, GET_INEGOT_MAXMPXCOUNT(base), LEN_INEGOT_MAXMPXCOUNT(base))\
-macro(maxnumbervcs, WORD, GET_INEGOT_MAXNUMBERVCS(base), LEN_INEGOT_MAXNUMBERVCS(base))\
-macro(maxbuffersize, LONG, GET_INEGOT_MAXBUFFERSIZE(base), LEN_INEGOT_MAXBUFFERSIZE(base))\
-macro(maxrawsize, LONG, GET_INEGOT_MAXRAWSIZE(base), LEN_INEGOT_MAXRAWSIZE(base))\
-macro(sessionkey, LONG, GET_INEGOT_SESSIONKEY(base), LEN_INEGOT_SESSIONKEY(base))\
-macro(capabilities, LONG, GET_INEGOT_CAPABILITIES(base), LEN_INEGOT_CAPABILITIES(base))\
-macro(systemtime, NTTIME, GET_INEGOT_SYSTEMTIME(base), LEN_INEGOT_SYSTEMTIME(base))\
-macro(servertimezone, SWORD, GET_INEGOT_SERVERTIMEZONE(base), LEN_INEGOT_SERVERTIMEZONE(base))\
-macro(encryptionkeylength, BYTE, GET_INEGOT_ENCRYPTIONKEYLENGTH(base), LEN_INEGOT_ENCRYPTIONKEYLENGTH(base))\
+do {\
+macro(dialectindex, WORD, GET_INEGOT_DIALECTINDEX(base), LEN_INEGOT_DIALECTINDEX(base));\
+macro(securitymode, BYTE, GET_INEGOT_SECURITYMODE(base), LEN_INEGOT_SECURITYMODE(base));\
+macro(maxmpxcount, WORD, GET_INEGOT_MAXMPXCOUNT(base), LEN_INEGOT_MAXMPXCOUNT(base));\
+macro(maxnumbervcs, WORD, GET_INEGOT_MAXNUMBERVCS(base), LEN_INEGOT_MAXNUMBERVCS(base));\
+macro(maxbuffersize, LONG, GET_INEGOT_MAXBUFFERSIZE(base), LEN_INEGOT_MAXBUFFERSIZE(base));\
+macro(maxrawsize, LONG, GET_INEGOT_MAXRAWSIZE(base), LEN_INEGOT_MAXRAWSIZE(base));\
+macro(sessionkey, LONG, GET_INEGOT_SESSIONKEY(base), LEN_INEGOT_SESSIONKEY(base));\
+macro(capabilities, LONG, GET_INEGOT_CAPABILITIES(base), LEN_INEGOT_CAPABILITIES(base));\
+macro(systemtime, NTTIME, GET_INEGOT_SYSTEMTIME(base), LEN_INEGOT_SYSTEMTIME(base));\
+macro(servertimezone, SWORD, GET_INEGOT_SERVERTIMEZONE(base), LEN_INEGOT_SERVERTIMEZONE(base));\
+macro(encryptionkeylength, BYTE, GET_INEGOT_ENCRYPTIONKEYLENGTH(base), LEN_INEGOT_ENCRYPTIONKEYLENGTH(base));\
+} while(0)
 
 #define OFF_OSESSIONSETUP_ANDX(base) 0
 #define PTR_OSESSIONSETUP_ANDX(base) (base + OFF_OSESSIONSETUP_ANDX(base))
@@ -235,15 +239,17 @@ macro(encryptionkeylength, BYTE, GET_INEGOT_ENCRYPTIONKEYLENGTH(base), LEN_INEGO
 #define SET_OSESSIONSETUP_CAPABILITIES(base, val) SET_LONG(base, OFF_OSESSIONSETUP_CAPABILITIES(base), val)
 #define LEN_OSESSIONSETUP(base) 26 
 #define ITR_OSESSIONSETUP(base, macro)\
-macro(andx, LONG, GET_OSESSIONSETUP_ANDX(base), LEN_OSESSIONSETUP_ANDX(base))\
-macro(maxbuffersize, WORD, GET_OSESSIONSETUP_MAXBUFFERSIZE(base), LEN_OSESSIONSETUP_MAXBUFFERSIZE(base))\
-macro(maxmpxcount, WORD, GET_OSESSIONSETUP_MAXMPXCOUNT(base), LEN_OSESSIONSETUP_MAXMPXCOUNT(base))\
-macro(vcnumber, WORD, GET_OSESSIONSETUP_VCNUMBER(base), LEN_OSESSIONSETUP_VCNUMBER(base))\
-macro(sessionkey, LONG, GET_OSESSIONSETUP_SESSIONKEY(base), LEN_OSESSIONSETUP_SESSIONKEY(base))\
-macro(ipwdlen, WORD, GET_OSESSIONSETUP_IPWDLEN(base), LEN_OSESSIONSETUP_IPWDLEN(base))\
-macro(pwdlen, WORD, GET_OSESSIONSETUP_PWDLEN(base), LEN_OSESSIONSETUP_PWDLEN(base))\
-macro(reserved, LONG, GET_OSESSIONSETUP_RESERVED(base), LEN_OSESSIONSETUP_RESERVED(base))\
-macro(capabilities, LONG, GET_OSESSIONSETUP_CAPABILITIES(base), LEN_OSESSIONSETUP_CAPABILITIES(base))\
+do {\
+macro(andx, LONG, GET_OSESSIONSETUP_ANDX(base), LEN_OSESSIONSETUP_ANDX(base));\
+macro(maxbuffersize, WORD, GET_OSESSIONSETUP_MAXBUFFERSIZE(base), LEN_OSESSIONSETUP_MAXBUFFERSIZE(base));\
+macro(maxmpxcount, WORD, GET_OSESSIONSETUP_MAXMPXCOUNT(base), LEN_OSESSIONSETUP_MAXMPXCOUNT(base));\
+macro(vcnumber, WORD, GET_OSESSIONSETUP_VCNUMBER(base), LEN_OSESSIONSETUP_VCNUMBER(base));\
+macro(sessionkey, LONG, GET_OSESSIONSETUP_SESSIONKEY(base), LEN_OSESSIONSETUP_SESSIONKEY(base));\
+macro(ipwdlen, WORD, GET_OSESSIONSETUP_IPWDLEN(base), LEN_OSESSIONSETUP_IPWDLEN(base));\
+macro(pwdlen, WORD, GET_OSESSIONSETUP_PWDLEN(base), LEN_OSESSIONSETUP_PWDLEN(base));\
+macro(reserved, LONG, GET_OSESSIONSETUP_RESERVED(base), LEN_OSESSIONSETUP_RESERVED(base));\
+macro(capabilities, LONG, GET_OSESSIONSETUP_CAPABILITIES(base), LEN_OSESSIONSETUP_CAPABILITIES(base));\
+} while(0)
 
 #define OFF_ISESSIONSETUP_ANDX(base) 0
 #define PTR_ISESSIONSETUP_ANDX(base) (base + OFF_ISESSIONSETUP_ANDX(base))
@@ -257,8 +263,10 @@ macro(capabilities, LONG, GET_OSESSIONSETUP_CAPABILITIES(base), LEN_OSESSIONSETU
 #define SET_ISESSIONSETUP_ACTION(base, val) SET_WORD(base, OFF_ISESSIONSETUP_ACTION(base), val)
 #define LEN_ISESSIONSETUP(base) 6 
 #define ITR_ISESSIONSETUP(base, macro)\
-macro(andx, LONG, GET_ISESSIONSETUP_ANDX(base), LEN_ISESSIONSETUP_ANDX(base))\
-macro(action, WORD, GET_ISESSIONSETUP_ACTION(base), LEN_ISESSIONSETUP_ACTION(base))\
+do {\
+macro(andx, LONG, GET_ISESSIONSETUP_ANDX(base), LEN_ISESSIONSETUP_ANDX(base));\
+macro(action, WORD, GET_ISESSIONSETUP_ACTION(base), LEN_ISESSIONSETUP_ACTION(base));\
+} while(0)
 
 #define OFF_OTREECONNECT_ANDX(base) 0
 #define PTR_OTREECONNECT_ANDX(base) (base + OFF_OTREECONNECT_ANDX(base))
@@ -277,9 +285,11 @@ macro(action, WORD, GET_ISESSIONSETUP_ACTION(base), LEN_ISESSIONSETUP_ACTION(bas
 #define SET_OTREECONNECT_PWDLEN(base, val) SET_WORD(base, OFF_OTREECONNECT_PWDLEN(base), val)
 #define LEN_OTREECONNECT(base) 8 
 #define ITR_OTREECONNECT(base, macro)\
-macro(andx, LONG, GET_OTREECONNECT_ANDX(base), LEN_OTREECONNECT_ANDX(base))\
-macro(flags, WORD, GET_OTREECONNECT_FLAGS(base), LEN_OTREECONNECT_FLAGS(base))\
-macro(pwdlen, WORD, GET_OTREECONNECT_PWDLEN(base), LEN_OTREECONNECT_PWDLEN(base))\
+do {\
+macro(andx, LONG, GET_OTREECONNECT_ANDX(base), LEN_OTREECONNECT_ANDX(base));\
+macro(flags, WORD, GET_OTREECONNECT_FLAGS(base), LEN_OTREECONNECT_FLAGS(base));\
+macro(pwdlen, WORD, GET_OTREECONNECT_PWDLEN(base), LEN_OTREECONNECT_PWDLEN(base));\
+} while(0)
 
 #define OFF_ITREECONNECT_ANDX(base) 0
 #define PTR_ITREECONNECT_ANDX(base) (base + OFF_ITREECONNECT_ANDX(base))
@@ -293,8 +303,10 @@ macro(pwdlen, WORD, GET_OTREECONNECT_PWDLEN(base), LEN_OTREECONNECT_PWDLEN(base)
 #define SET_ITREECONNECT_OPTIONALSUPPORT(base, val) SET_WORD(base, OFF_ITREECONNECT_OPTIONALSUPPORT(base), val)
 #define LEN_ITREECONNECT(base) 6 
 #define ITR_ITREECONNECT(base, macro)\
-macro(andx, LONG, GET_ITREECONNECT_ANDX(base), LEN_ITREECONNECT_ANDX(base))\
-macro(optionalsupport, WORD, GET_ITREECONNECT_OPTIONALSUPPORT(base), LEN_ITREECONNECT_OPTIONALSUPPORT(base))\
+do {\
+macro(andx, LONG, GET_ITREECONNECT_ANDX(base), LEN_ITREECONNECT_ANDX(base));\
+macro(optionalsupport, WORD, GET_ITREECONNECT_OPTIONALSUPPORT(base), LEN_ITREECONNECT_OPTIONALSUPPORT(base));\
+} while(0)
 
 #define OFF_OTRANS_TOTAL_PARAM_COUNT(base) 0
 #define PTR_OTRANS_TOTAL_PARAM_COUNT(base) (base + OFF_OTRANS_TOTAL_PARAM_COUNT(base))
@@ -367,20 +379,22 @@ macro(optionalsupport, WORD, GET_ITREECONNECT_OPTIONALSUPPORT(base), LEN_ITREECO
 #define END_OTRANS_SETUP(base, end) SETLEN_OTRANS_SETUP(base, end - GET_OTRANS_SETUP(base))
 #define LEN_OTRANS(base) 28  + LEN_OTRANS_SETUP(base)
 #define ITR_OTRANS(base, macro)\
-macro(total_param_count, WORD, GET_OTRANS_TOTAL_PARAM_COUNT(base), LEN_OTRANS_TOTAL_PARAM_COUNT(base))\
-macro(total_data_count, WORD, GET_OTRANS_TOTAL_DATA_COUNT(base), LEN_OTRANS_TOTAL_DATA_COUNT(base))\
-macro(max_param_count, WORD, GET_OTRANS_MAX_PARAM_COUNT(base), LEN_OTRANS_MAX_PARAM_COUNT(base))\
-macro(max_data_count, WORD, GET_OTRANS_MAX_DATA_COUNT(base), LEN_OTRANS_MAX_DATA_COUNT(base))\
-macro(max_setup_count, WORD, GET_OTRANS_MAX_SETUP_COUNT(base), LEN_OTRANS_MAX_SETUP_COUNT(base))\
-macro(flags, WORD, GET_OTRANS_FLAGS(base), LEN_OTRANS_FLAGS(base))\
-macro(timeout, LONG, GET_OTRANS_TIMEOUT(base), LEN_OTRANS_TIMEOUT(base))\
-macro(reserved, WORD, GET_OTRANS_RESERVED(base), LEN_OTRANS_RESERVED(base))\
-macro(param_count, WORD, GET_OTRANS_PARAM_COUNT(base), LEN_OTRANS_PARAM_COUNT(base))\
-macro(param_offset, WORD, GET_OTRANS_PARAM_OFFSET(base), LEN_OTRANS_PARAM_OFFSET(base))\
-macro(data_count, WORD, GET_OTRANS_DATA_COUNT(base), LEN_OTRANS_DATA_COUNT(base))\
-macro(data_offset, WORD, GET_OTRANS_DATA_OFFSET(base), LEN_OTRANS_DATA_OFFSET(base))\
-macro(setup_count, WORD, GET_OTRANS_SETUP_COUNT(base), LEN_OTRANS_SETUP_COUNT(base))\
-macro(setup, BLOB, GET_OTRANS_SETUP(base), LEN_OTRANS_SETUP(base))\
+do {\
+macro(total_param_count, WORD, GET_OTRANS_TOTAL_PARAM_COUNT(base), LEN_OTRANS_TOTAL_PARAM_COUNT(base));\
+macro(total_data_count, WORD, GET_OTRANS_TOTAL_DATA_COUNT(base), LEN_OTRANS_TOTAL_DATA_COUNT(base));\
+macro(max_param_count, WORD, GET_OTRANS_MAX_PARAM_COUNT(base), LEN_OTRANS_MAX_PARAM_COUNT(base));\
+macro(max_data_count, WORD, GET_OTRANS_MAX_DATA_COUNT(base), LEN_OTRANS_MAX_DATA_COUNT(base));\
+macro(max_setup_count, WORD, GET_OTRANS_MAX_SETUP_COUNT(base), LEN_OTRANS_MAX_SETUP_COUNT(base));\
+macro(flags, WORD, GET_OTRANS_FLAGS(base), LEN_OTRANS_FLAGS(base));\
+macro(timeout, LONG, GET_OTRANS_TIMEOUT(base), LEN_OTRANS_TIMEOUT(base));\
+macro(reserved, WORD, GET_OTRANS_RESERVED(base), LEN_OTRANS_RESERVED(base));\
+macro(param_count, WORD, GET_OTRANS_PARAM_COUNT(base), LEN_OTRANS_PARAM_COUNT(base));\
+macro(param_offset, WORD, GET_OTRANS_PARAM_OFFSET(base), LEN_OTRANS_PARAM_OFFSET(base));\
+macro(data_count, WORD, GET_OTRANS_DATA_COUNT(base), LEN_OTRANS_DATA_COUNT(base));\
+macro(data_offset, WORD, GET_OTRANS_DATA_OFFSET(base), LEN_OTRANS_DATA_OFFSET(base));\
+macro(setup_count, WORD, GET_OTRANS_SETUP_COUNT(base), LEN_OTRANS_SETUP_COUNT(base));\
+macro(setup, BLOB, GET_OTRANS_SETUP(base), LEN_OTRANS_SETUP(base));\
+} while(0)
 
 #define LEN_OTRANS_SETUP(base)		GET_OTRANS_SETUP_COUNT(base)*2
 #define SETLEN_OTRANS_SETUP(base, len) 	SET_OTRANS_SETUP_COUNT(base, len/2)
@@ -431,15 +445,17 @@ macro(setup, BLOB, GET_OTRANS_SETUP(base), LEN_OTRANS_SETUP(base))\
 #define SET_OTRANSS_FID(base, val) SET_WORD(base, OFF_OTRANSS_FID(base), val)
 #define LEN_OTRANSS(base) 18 
 #define ITR_OTRANSS(base, macro)\
-macro(total_param_count, WORD, GET_OTRANSS_TOTAL_PARAM_COUNT(base), LEN_OTRANSS_TOTAL_PARAM_COUNT(base))\
-macro(total_data_count, WORD, GET_OTRANSS_TOTAL_DATA_COUNT(base), LEN_OTRANSS_TOTAL_DATA_COUNT(base))\
-macro(param_count, WORD, GET_OTRANSS_PARAM_COUNT(base), LEN_OTRANSS_PARAM_COUNT(base))\
-macro(param_offset, WORD, GET_OTRANSS_PARAM_OFFSET(base), LEN_OTRANSS_PARAM_OFFSET(base))\
-macro(param_displacement, WORD, GET_OTRANSS_PARAM_DISPLACEMENT(base), LEN_OTRANSS_PARAM_DISPLACEMENT(base))\
-macro(data_count, WORD, GET_OTRANSS_DATA_COUNT(base), LEN_OTRANSS_DATA_COUNT(base))\
-macro(data_offset, WORD, GET_OTRANSS_DATA_OFFSET(base), LEN_OTRANSS_DATA_OFFSET(base))\
-macro(data_displacement, WORD, GET_OTRANSS_DATA_DISPLACEMENT(base), LEN_OTRANSS_DATA_DISPLACEMENT(base))\
-macro(fid, WORD, GET_OTRANSS_FID(base), LEN_OTRANSS_FID(base))\
+do {\
+macro(total_param_count, WORD, GET_OTRANSS_TOTAL_PARAM_COUNT(base), LEN_OTRANSS_TOTAL_PARAM_COUNT(base));\
+macro(total_data_count, WORD, GET_OTRANSS_TOTAL_DATA_COUNT(base), LEN_OTRANSS_TOTAL_DATA_COUNT(base));\
+macro(param_count, WORD, GET_OTRANSS_PARAM_COUNT(base), LEN_OTRANSS_PARAM_COUNT(base));\
+macro(param_offset, WORD, GET_OTRANSS_PARAM_OFFSET(base), LEN_OTRANSS_PARAM_OFFSET(base));\
+macro(param_displacement, WORD, GET_OTRANSS_PARAM_DISPLACEMENT(base), LEN_OTRANSS_PARAM_DISPLACEMENT(base));\
+macro(data_count, WORD, GET_OTRANSS_DATA_COUNT(base), LEN_OTRANSS_DATA_COUNT(base));\
+macro(data_offset, WORD, GET_OTRANSS_DATA_OFFSET(base), LEN_OTRANSS_DATA_OFFSET(base));\
+macro(data_displacement, WORD, GET_OTRANSS_DATA_DISPLACEMENT(base), LEN_OTRANSS_DATA_DISPLACEMENT(base));\
+macro(fid, WORD, GET_OTRANSS_FID(base), LEN_OTRANSS_FID(base));\
+} while(0)
 
 #define OFF_ITRANSS_TOTAL_PARAM_COUNT(base) 0
 #define PTR_ITRANSS_TOTAL_PARAM_COUNT(base) (base + OFF_ITRANSS_TOTAL_PARAM_COUNT(base))
@@ -497,17 +513,19 @@ macro(fid, WORD, GET_OTRANSS_FID(base), LEN_OTRANSS_FID(base))\
 #define END_ITRANSS_SETUP(base, end) SETLEN_ITRANSS_SETUP(base, end - GET_ITRANSS_SETUP(base))
 #define LEN_ITRANSS(base) 20  + LEN_ITRANSS_SETUP(base)
 #define ITR_ITRANSS(base, macro)\
-macro(total_param_count, WORD, GET_ITRANSS_TOTAL_PARAM_COUNT(base), LEN_ITRANSS_TOTAL_PARAM_COUNT(base))\
-macro(total_data_count, WORD, GET_ITRANSS_TOTAL_DATA_COUNT(base), LEN_ITRANSS_TOTAL_DATA_COUNT(base))\
-macro(reserved, WORD, GET_ITRANSS_RESERVED(base), LEN_ITRANSS_RESERVED(base))\
-macro(param_count, WORD, GET_ITRANSS_PARAM_COUNT(base), LEN_ITRANSS_PARAM_COUNT(base))\
-macro(param_offset, WORD, GET_ITRANSS_PARAM_OFFSET(base), LEN_ITRANSS_PARAM_OFFSET(base))\
-macro(param_displacement, WORD, GET_ITRANSS_PARAM_DISPLACEMENT(base), LEN_ITRANSS_PARAM_DISPLACEMENT(base))\
-macro(data_count, WORD, GET_ITRANSS_DATA_COUNT(base), LEN_ITRANSS_DATA_COUNT(base))\
-macro(data_offset, WORD, GET_ITRANSS_DATA_OFFSET(base), LEN_ITRANSS_DATA_OFFSET(base))\
-macro(data_displacement, WORD, GET_ITRANSS_DATA_DISPLACEMENT(base), LEN_ITRANSS_DATA_DISPLACEMENT(base))\
-macro(setup_count, WORD, GET_ITRANSS_SETUP_COUNT(base), LEN_ITRANSS_SETUP_COUNT(base))\
-macro(setup, BLOB, GET_ITRANSS_SETUP(base), LEN_ITRANSS_SETUP(base))\
+do {\
+macro(total_param_count, WORD, GET_ITRANSS_TOTAL_PARAM_COUNT(base), LEN_ITRANSS_TOTAL_PARAM_COUNT(base));\
+macro(total_data_count, WORD, GET_ITRANSS_TOTAL_DATA_COUNT(base), LEN_ITRANSS_TOTAL_DATA_COUNT(base));\
+macro(reserved, WORD, GET_ITRANSS_RESERVED(base), LEN_ITRANSS_RESERVED(base));\
+macro(param_count, WORD, GET_ITRANSS_PARAM_COUNT(base), LEN_ITRANSS_PARAM_COUNT(base));\
+macro(param_offset, WORD, GET_ITRANSS_PARAM_OFFSET(base), LEN_ITRANSS_PARAM_OFFSET(base));\
+macro(param_displacement, WORD, GET_ITRANSS_PARAM_DISPLACEMENT(base), LEN_ITRANSS_PARAM_DISPLACEMENT(base));\
+macro(data_count, WORD, GET_ITRANSS_DATA_COUNT(base), LEN_ITRANSS_DATA_COUNT(base));\
+macro(data_offset, WORD, GET_ITRANSS_DATA_OFFSET(base), LEN_ITRANSS_DATA_OFFSET(base));\
+macro(data_displacement, WORD, GET_ITRANSS_DATA_DISPLACEMENT(base), LEN_ITRANSS_DATA_DISPLACEMENT(base));\
+macro(setup_count, WORD, GET_ITRANSS_SETUP_COUNT(base), LEN_ITRANSS_SETUP_COUNT(base));\
+macro(setup, BLOB, GET_ITRANSS_SETUP(base), LEN_ITRANSS_SETUP(base));\
+} while(0)
 
 #define LEN_ITRANSS_SETUP(base)		GET_ITRANSS_SETUP_COUNT(base)*2
 #define SETLEN_ITRANSS_SETUP(base, len)	SET_ITRANSS_SETUP_COUNT(base, len/2)
@@ -583,20 +601,22 @@ macro(setup, BLOB, GET_ITRANSS_SETUP(base), LEN_ITRANSS_SETUP(base))\
 #define SET_ONTTRAN_SETUP(base, val) SET_WORD(base, OFF_ONTTRAN_SETUP(base), val)
 #define LEN_ONTTRAN(base) 41 
 #define ITR_ONTTRAN(base, macro)\
-macro(max_setup_count, BYTE, GET_ONTTRAN_MAX_SETUP_COUNT(base), LEN_ONTTRAN_MAX_SETUP_COUNT(base))\
-macro(reserved, WORD, GET_ONTTRAN_RESERVED(base), LEN_ONTTRAN_RESERVED(base))\
-macro(total_param_count, LONG, GET_ONTTRAN_TOTAL_PARAM_COUNT(base), LEN_ONTTRAN_TOTAL_PARAM_COUNT(base))\
-macro(total_data_count, LONG, GET_ONTTRAN_TOTAL_DATA_COUNT(base), LEN_ONTTRAN_TOTAL_DATA_COUNT(base))\
-macro(max_param_count, LONG, GET_ONTTRAN_MAX_PARAM_COUNT(base), LEN_ONTTRAN_MAX_PARAM_COUNT(base))\
-macro(max_data_count, LONG, GET_ONTTRAN_MAX_DATA_COUNT(base), LEN_ONTTRAN_MAX_DATA_COUNT(base))\
-macro(param_count, LONG, GET_ONTTRAN_PARAM_COUNT(base), LEN_ONTTRAN_PARAM_COUNT(base))\
-macro(param_offset, LONG, GET_ONTTRAN_PARAM_OFFSET(base), LEN_ONTTRAN_PARAM_OFFSET(base))\
-macro(data_count, LONG, GET_ONTTRAN_DATA_COUNT(base), LEN_ONTTRAN_DATA_COUNT(base))\
-macro(data_offset, LONG, GET_ONTTRAN_DATA_OFFSET(base), LEN_ONTTRAN_DATA_OFFSET(base))\
-macro(setup_count, BYTE, GET_ONTTRAN_SETUP_COUNT(base), LEN_ONTTRAN_SETUP_COUNT(base))\
-macro(function, WORD, GET_ONTTRAN_FUNCTION(base), LEN_ONTTRAN_FUNCTION(base))\
-macro(buffer, BYTE, GET_ONTTRAN_BUFFER(base), LEN_ONTTRAN_BUFFER(base))\
-macro(setup, WORD, GET_ONTTRAN_SETUP(base), LEN_ONTTRAN_SETUP(base))\
+do {\
+macro(max_setup_count, BYTE, GET_ONTTRAN_MAX_SETUP_COUNT(base), LEN_ONTTRAN_MAX_SETUP_COUNT(base));\
+macro(reserved, WORD, GET_ONTTRAN_RESERVED(base), LEN_ONTTRAN_RESERVED(base));\
+macro(total_param_count, LONG, GET_ONTTRAN_TOTAL_PARAM_COUNT(base), LEN_ONTTRAN_TOTAL_PARAM_COUNT(base));\
+macro(total_data_count, LONG, GET_ONTTRAN_TOTAL_DATA_COUNT(base), LEN_ONTTRAN_TOTAL_DATA_COUNT(base));\
+macro(max_param_count, LONG, GET_ONTTRAN_MAX_PARAM_COUNT(base), LEN_ONTTRAN_MAX_PARAM_COUNT(base));\
+macro(max_data_count, LONG, GET_ONTTRAN_MAX_DATA_COUNT(base), LEN_ONTTRAN_MAX_DATA_COUNT(base));\
+macro(param_count, LONG, GET_ONTTRAN_PARAM_COUNT(base), LEN_ONTTRAN_PARAM_COUNT(base));\
+macro(param_offset, LONG, GET_ONTTRAN_PARAM_OFFSET(base), LEN_ONTTRAN_PARAM_OFFSET(base));\
+macro(data_count, LONG, GET_ONTTRAN_DATA_COUNT(base), LEN_ONTTRAN_DATA_COUNT(base));\
+macro(data_offset, LONG, GET_ONTTRAN_DATA_OFFSET(base), LEN_ONTTRAN_DATA_OFFSET(base));\
+macro(setup_count, BYTE, GET_ONTTRAN_SETUP_COUNT(base), LEN_ONTTRAN_SETUP_COUNT(base));\
+macro(function, WORD, GET_ONTTRAN_FUNCTION(base), LEN_ONTTRAN_FUNCTION(base));\
+macro(buffer, BYTE, GET_ONTTRAN_BUFFER(base), LEN_ONTTRAN_BUFFER(base));\
+macro(setup, WORD, GET_ONTTRAN_SETUP(base), LEN_ONTTRAN_SETUP(base));\
+} while(0)
 
 #define OFF_OFINDFIRST_SEARCH_ATTRIBUTES(base) 0
 #define PTR_OFINDFIRST_SEARCH_ATTRIBUTES(base) (base + OFF_OFINDFIRST_SEARCH_ATTRIBUTES(base))
@@ -629,12 +649,14 @@ macro(setup, WORD, GET_ONTTRAN_SETUP(base), LEN_ONTTRAN_SETUP(base))\
 #define END_OFINDFIRST_MASK(base, end) SETLEN_OFINDFIRST_MASK(base, end - GET_OFINDFIRST_MASK(base))
 #define LEN_OFINDFIRST(base) 12  + LEN_OFINDFIRST_MASK(base)
 #define ITR_OFINDFIRST(base, macro)\
-macro(search_attributes, WORD, GET_OFINDFIRST_SEARCH_ATTRIBUTES(base), LEN_OFINDFIRST_SEARCH_ATTRIBUTES(base))\
-macro(search_count, WORD, GET_OFINDFIRST_SEARCH_COUNT(base), LEN_OFINDFIRST_SEARCH_COUNT(base))\
-macro(flags, WORD, GET_OFINDFIRST_FLAGS(base), LEN_OFINDFIRST_FLAGS(base))\
-macro(information_level, WORD, GET_OFINDFIRST_INFORMATION_LEVEL(base), LEN_OFINDFIRST_INFORMATION_LEVEL(base))\
-macro(search_storage_type, LONG, GET_OFINDFIRST_SEARCH_STORAGE_TYPE(base), LEN_OFINDFIRST_SEARCH_STORAGE_TYPE(base))\
-macro(mask, BLOB, GET_OFINDFIRST_MASK(base), LEN_OFINDFIRST_MASK(base))\
+do {\
+macro(search_attributes, WORD, GET_OFINDFIRST_SEARCH_ATTRIBUTES(base), LEN_OFINDFIRST_SEARCH_ATTRIBUTES(base));\
+macro(search_count, WORD, GET_OFINDFIRST_SEARCH_COUNT(base), LEN_OFINDFIRST_SEARCH_COUNT(base));\
+macro(flags, WORD, GET_OFINDFIRST_FLAGS(base), LEN_OFINDFIRST_FLAGS(base));\
+macro(information_level, WORD, GET_OFINDFIRST_INFORMATION_LEVEL(base), LEN_OFINDFIRST_INFORMATION_LEVEL(base));\
+macro(search_storage_type, LONG, GET_OFINDFIRST_SEARCH_STORAGE_TYPE(base), LEN_OFINDFIRST_SEARCH_STORAGE_TYPE(base));\
+macro(mask, BLOB, GET_OFINDFIRST_MASK(base), LEN_OFINDFIRST_MASK(base));\
+} while(0)
 
 #define LEN_OFINDFIRST_MASK(base)	strlen(PTR_OFINDFIRST_MASK(base))+1
 #define OFF_IFINDFIRST_SID(base) 0
@@ -664,11 +686,13 @@ macro(mask, BLOB, GET_OFINDFIRST_MASK(base), LEN_OFINDFIRST_MASK(base))\
 #define SET_IFINDFIRST_LAST_NAME_OFFSET(base, val) SET_WORD(base, OFF_IFINDFIRST_LAST_NAME_OFFSET(base), val)
 #define LEN_IFINDFIRST(base) 10 
 #define ITR_IFINDFIRST(base, macro)\
-macro(sid, WORD, GET_IFINDFIRST_SID(base), LEN_IFINDFIRST_SID(base))\
-macro(search_count, WORD, GET_IFINDFIRST_SEARCH_COUNT(base), LEN_IFINDFIRST_SEARCH_COUNT(base))\
-macro(end_of_search, WORD, GET_IFINDFIRST_END_OF_SEARCH(base), LEN_IFINDFIRST_END_OF_SEARCH(base))\
-macro(ea_error_offset, WORD, GET_IFINDFIRST_EA_ERROR_OFFSET(base), LEN_IFINDFIRST_EA_ERROR_OFFSET(base))\
-macro(last_name_offset, WORD, GET_IFINDFIRST_LAST_NAME_OFFSET(base), LEN_IFINDFIRST_LAST_NAME_OFFSET(base))\
+do {\
+macro(sid, WORD, GET_IFINDFIRST_SID(base), LEN_IFINDFIRST_SID(base));\
+macro(search_count, WORD, GET_IFINDFIRST_SEARCH_COUNT(base), LEN_IFINDFIRST_SEARCH_COUNT(base));\
+macro(end_of_search, WORD, GET_IFINDFIRST_END_OF_SEARCH(base), LEN_IFINDFIRST_END_OF_SEARCH(base));\
+macro(ea_error_offset, WORD, GET_IFINDFIRST_EA_ERROR_OFFSET(base), LEN_IFINDFIRST_EA_ERROR_OFFSET(base));\
+macro(last_name_offset, WORD, GET_IFINDFIRST_LAST_NAME_OFFSET(base), LEN_IFINDFIRST_LAST_NAME_OFFSET(base));\
+} while(0)
 
 #define OFF_OFINDNEXT_SID(base) 0
 #define PTR_OFINDNEXT_SID(base) (base + OFF_OFINDNEXT_SID(base))
@@ -701,12 +725,14 @@ macro(last_name_offset, WORD, GET_IFINDFIRST_LAST_NAME_OFFSET(base), LEN_IFINDFI
 #define END_OFINDNEXT_MASK(base, end) SETLEN_OFINDNEXT_MASK(base, end - GET_OFINDNEXT_MASK(base))
 #define LEN_OFINDNEXT(base) 12  + LEN_OFINDNEXT_MASK(base)
 #define ITR_OFINDNEXT(base, macro)\
-macro(sid, WORD, GET_OFINDNEXT_SID(base), LEN_OFINDNEXT_SID(base))\
-macro(search_count, WORD, GET_OFINDNEXT_SEARCH_COUNT(base), LEN_OFINDNEXT_SEARCH_COUNT(base))\
-macro(information_level, WORD, GET_OFINDNEXT_INFORMATION_LEVEL(base), LEN_OFINDNEXT_INFORMATION_LEVEL(base))\
-macro(resume_key, LONG, GET_OFINDNEXT_RESUME_KEY(base), LEN_OFINDNEXT_RESUME_KEY(base))\
-macro(flags, WORD, GET_OFINDNEXT_FLAGS(base), LEN_OFINDNEXT_FLAGS(base))\
-macro(mask, BLOB, GET_OFINDNEXT_MASK(base), LEN_OFINDNEXT_MASK(base))\
+do {\
+macro(sid, WORD, GET_OFINDNEXT_SID(base), LEN_OFINDNEXT_SID(base));\
+macro(search_count, WORD, GET_OFINDNEXT_SEARCH_COUNT(base), LEN_OFINDNEXT_SEARCH_COUNT(base));\
+macro(information_level, WORD, GET_OFINDNEXT_INFORMATION_LEVEL(base), LEN_OFINDNEXT_INFORMATION_LEVEL(base));\
+macro(resume_key, LONG, GET_OFINDNEXT_RESUME_KEY(base), LEN_OFINDNEXT_RESUME_KEY(base));\
+macro(flags, WORD, GET_OFINDNEXT_FLAGS(base), LEN_OFINDNEXT_FLAGS(base));\
+macro(mask, BLOB, GET_OFINDNEXT_MASK(base), LEN_OFINDNEXT_MASK(base));\
+} while(0)
 
 #define LEN_OFINDNEXT_MASK(base)	strlen(PTR_OFINDNEXT_MASK(base))+1
 #define OFF_IFINDNEXT_SEARCH_COUNT(base) 0
@@ -731,10 +757,12 @@ macro(mask, BLOB, GET_OFINDNEXT_MASK(base), LEN_OFINDNEXT_MASK(base))\
 #define SET_IFINDNEXT_LAST_NAME_OFFSET(base, val) SET_WORD(base, OFF_IFINDNEXT_LAST_NAME_OFFSET(base), val)
 #define LEN_IFINDNEXT(base) 8 
 #define ITR_IFINDNEXT(base, macro)\
-macro(search_count, WORD, GET_IFINDNEXT_SEARCH_COUNT(base), LEN_IFINDNEXT_SEARCH_COUNT(base))\
-macro(end_of_search, WORD, GET_IFINDNEXT_END_OF_SEARCH(base), LEN_IFINDNEXT_END_OF_SEARCH(base))\
-macro(ea_error_offset, WORD, GET_IFINDNEXT_EA_ERROR_OFFSET(base), LEN_IFINDNEXT_EA_ERROR_OFFSET(base))\
-macro(last_name_offset, WORD, GET_IFINDNEXT_LAST_NAME_OFFSET(base), LEN_IFINDNEXT_LAST_NAME_OFFSET(base))\
+do {\
+macro(search_count, WORD, GET_IFINDNEXT_SEARCH_COUNT(base), LEN_IFINDNEXT_SEARCH_COUNT(base));\
+macro(end_of_search, WORD, GET_IFINDNEXT_END_OF_SEARCH(base), LEN_IFINDNEXT_END_OF_SEARCH(base));\
+macro(ea_error_offset, WORD, GET_IFINDNEXT_EA_ERROR_OFFSET(base), LEN_IFINDNEXT_EA_ERROR_OFFSET(base));\
+macro(last_name_offset, WORD, GET_IFINDNEXT_LAST_NAME_OFFSET(base), LEN_IFINDNEXT_LAST_NAME_OFFSET(base));\
+} while(0)
 
 #define OFF_DIRINFO_NEXT_ENTRY_OFFSET(base) 0
 #define PTR_DIRINFO_NEXT_ENTRY_OFFSET(base) (base + OFF_DIRINFO_NEXT_ENTRY_OFFSET(base))
@@ -792,17 +820,19 @@ macro(last_name_offset, WORD, GET_IFINDNEXT_LAST_NAME_OFFSET(base), LEN_IFINDNEX
 #define END_DIRINFO_NAME(base, end) SETLEN_DIRINFO_NAME(base, end - GET_DIRINFO_NAME(base))
 #define LEN_DIRINFO(base) 64  + LEN_DIRINFO_NAME(base)
 #define ITR_DIRINFO(base, macro)\
-macro(next_entry_offset, LONG, GET_DIRINFO_NEXT_ENTRY_OFFSET(base), LEN_DIRINFO_NEXT_ENTRY_OFFSET(base))\
-macro(file_index, LONG, GET_DIRINFO_FILE_INDEX(base), LEN_DIRINFO_FILE_INDEX(base))\
-macro(creation_time, NTTIME, GET_DIRINFO_CREATION_TIME(base), LEN_DIRINFO_CREATION_TIME(base))\
-macro(access_time, NTTIME, GET_DIRINFO_ACCESS_TIME(base), LEN_DIRINFO_ACCESS_TIME(base))\
-macro(write_time, NTTIME, GET_DIRINFO_WRITE_TIME(base), LEN_DIRINFO_WRITE_TIME(base))\
-macro(change_time, NTTIME, GET_DIRINFO_CHANGE_TIME(base), LEN_DIRINFO_CHANGE_TIME(base))\
-macro(file_size, QUAD, GET_DIRINFO_FILE_SIZE(base), LEN_DIRINFO_FILE_SIZE(base))\
-macro(allocation_size, QUAD, GET_DIRINFO_ALLOCATION_SIZE(base), LEN_DIRINFO_ALLOCATION_SIZE(base))\
-macro(attributes, LONG, GET_DIRINFO_ATTRIBUTES(base), LEN_DIRINFO_ATTRIBUTES(base))\
-macro(name_len, LONG, GET_DIRINFO_NAME_LEN(base), LEN_DIRINFO_NAME_LEN(base))\
-macro(name, BLOB, GET_DIRINFO_NAME(base), LEN_DIRINFO_NAME(base))\
+do {\
+macro(next_entry_offset, LONG, GET_DIRINFO_NEXT_ENTRY_OFFSET(base), LEN_DIRINFO_NEXT_ENTRY_OFFSET(base));\
+macro(file_index, LONG, GET_DIRINFO_FILE_INDEX(base), LEN_DIRINFO_FILE_INDEX(base));\
+macro(creation_time, NTTIME, GET_DIRINFO_CREATION_TIME(base), LEN_DIRINFO_CREATION_TIME(base));\
+macro(access_time, NTTIME, GET_DIRINFO_ACCESS_TIME(base), LEN_DIRINFO_ACCESS_TIME(base));\
+macro(write_time, NTTIME, GET_DIRINFO_WRITE_TIME(base), LEN_DIRINFO_WRITE_TIME(base));\
+macro(change_time, NTTIME, GET_DIRINFO_CHANGE_TIME(base), LEN_DIRINFO_CHANGE_TIME(base));\
+macro(file_size, QUAD, GET_DIRINFO_FILE_SIZE(base), LEN_DIRINFO_FILE_SIZE(base));\
+macro(allocation_size, QUAD, GET_DIRINFO_ALLOCATION_SIZE(base), LEN_DIRINFO_ALLOCATION_SIZE(base));\
+macro(attributes, LONG, GET_DIRINFO_ATTRIBUTES(base), LEN_DIRINFO_ATTRIBUTES(base));\
+macro(name_len, LONG, GET_DIRINFO_NAME_LEN(base), LEN_DIRINFO_NAME_LEN(base));\
+macro(name, BLOB, GET_DIRINFO_NAME(base), LEN_DIRINFO_NAME(base));\
+} while(0)
 
 #define LEN_DIRINFO_NAME(base)		GET_DIRINFO_NAME_LEN(base)
 #define SETLEN_DIRINFO_NAME(base, len)	SET_DIRINFO_NAME_LEN(base, len)
@@ -828,10 +858,12 @@ macro(name, BLOB, GET_DIRINFO_NAME(base), LEN_DIRINFO_NAME(base))\
 #define SET_RAPENUM_AVAIL_COUNT(base, val) SET_WORD(base, OFF_RAPENUM_AVAIL_COUNT(base), val)
 #define LEN_RAPENUM(base) 8 
 #define ITR_RAPENUM(base, macro)\
-macro(status, WORD, GET_RAPENUM_STATUS(base), LEN_RAPENUM_STATUS(base))\
-macro(convert, WORD, GET_RAPENUM_CONVERT(base), LEN_RAPENUM_CONVERT(base))\
-macro(entry_count, WORD, GET_RAPENUM_ENTRY_COUNT(base), LEN_RAPENUM_ENTRY_COUNT(base))\
-macro(avail_count, WORD, GET_RAPENUM_AVAIL_COUNT(base), LEN_RAPENUM_AVAIL_COUNT(base))\
+do {\
+macro(status, WORD, GET_RAPENUM_STATUS(base), LEN_RAPENUM_STATUS(base));\
+macro(convert, WORD, GET_RAPENUM_CONVERT(base), LEN_RAPENUM_CONVERT(base));\
+macro(entry_count, WORD, GET_RAPENUM_ENTRY_COUNT(base), LEN_RAPENUM_ENTRY_COUNT(base));\
+macro(avail_count, WORD, GET_RAPENUM_AVAIL_COUNT(base), LEN_RAPENUM_AVAIL_COUNT(base));\
+} while(0)
 
 #define OFF_SHAREENUM_NAME(base) 0
 #define PTR_SHAREENUM_NAME(base) (base + OFF_SHAREENUM_NAME(base))
@@ -854,10 +886,12 @@ macro(avail_count, WORD, GET_RAPENUM_AVAIL_COUNT(base), LEN_RAPENUM_AVAIL_COUNT(
 #define SET_SHAREENUM_COMMENT(base, val) SET_LONG(base, OFF_SHAREENUM_COMMENT(base), val)
 #define LEN_SHAREENUM(base) 7  + LEN_SHAREENUM_NAME(base)
 #define ITR_SHAREENUM(base, macro)\
-macro(name, BLOB, GET_SHAREENUM_NAME(base), LEN_SHAREENUM_NAME(base))\
-macro(pad, BYTE, GET_SHAREENUM_PAD(base), LEN_SHAREENUM_PAD(base))\
-macro(type, WORD, GET_SHAREENUM_TYPE(base), LEN_SHAREENUM_TYPE(base))\
-macro(comment, LONG, GET_SHAREENUM_COMMENT(base), LEN_SHAREENUM_COMMENT(base))\
+do {\
+macro(name, BLOB, GET_SHAREENUM_NAME(base), LEN_SHAREENUM_NAME(base));\
+macro(pad, BYTE, GET_SHAREENUM_PAD(base), LEN_SHAREENUM_PAD(base));\
+macro(type, WORD, GET_SHAREENUM_TYPE(base), LEN_SHAREENUM_TYPE(base));\
+macro(comment, LONG, GET_SHAREENUM_COMMENT(base), LEN_SHAREENUM_COMMENT(base));\
+} while(0)
 
 #define LEN_SHAREENUM_NAME(base)	13
 #define OFF_SERVERENUM_NAME(base) 0
@@ -886,11 +920,13 @@ macro(comment, LONG, GET_SHAREENUM_COMMENT(base), LEN_SHAREENUM_COMMENT(base))\
 #define SET_SERVERENUM_COMMENT(base, val) SET_LONG(base, OFF_SERVERENUM_COMMENT(base), val)
 #define LEN_SERVERENUM(base) 10  + LEN_SERVERENUM_NAME(base)
 #define ITR_SERVERENUM(base, macro)\
-macro(name, BLOB, GET_SERVERENUM_NAME(base), LEN_SERVERENUM_NAME(base))\
-macro(major, BYTE, GET_SERVERENUM_MAJOR(base), LEN_SERVERENUM_MAJOR(base))\
-macro(minor, BYTE, GET_SERVERENUM_MINOR(base), LEN_SERVERENUM_MINOR(base))\
-macro(type, LONG, GET_SERVERENUM_TYPE(base), LEN_SERVERENUM_TYPE(base))\
-macro(comment, LONG, GET_SERVERENUM_COMMENT(base), LEN_SERVERENUM_COMMENT(base))\
+do {\
+macro(name, BLOB, GET_SERVERENUM_NAME(base), LEN_SERVERENUM_NAME(base));\
+macro(major, BYTE, GET_SERVERENUM_MAJOR(base), LEN_SERVERENUM_MAJOR(base));\
+macro(minor, BYTE, GET_SERVERENUM_MINOR(base), LEN_SERVERENUM_MINOR(base));\
+macro(type, LONG, GET_SERVERENUM_TYPE(base), LEN_SERVERENUM_TYPE(base));\
+macro(comment, LONG, GET_SERVERENUM_COMMENT(base), LEN_SERVERENUM_COMMENT(base));\
+} while(0)
 
 #define LEN_SERVERENUM_NAME(base)	16
 #define OFF_OREADRAW_FID(base) 0
@@ -930,13 +966,15 @@ macro(comment, LONG, GET_SERVERENUM_COMMENT(base), LEN_SERVERENUM_COMMENT(base))
 #define SET_OREADRAW_OFFSET_HIGH(base, val) SET_LONG(base, OFF_OREADRAW_OFFSET_HIGH(base), val)
 #define LEN_OREADRAW(base) 20 
 #define ITR_OREADRAW(base, macro)\
-macro(fid, WORD, GET_OREADRAW_FID(base), LEN_OREADRAW_FID(base))\
-macro(offset, LONG, GET_OREADRAW_OFFSET(base), LEN_OREADRAW_OFFSET(base))\
-macro(max_count, WORD, GET_OREADRAW_MAX_COUNT(base), LEN_OREADRAW_MAX_COUNT(base))\
-macro(min_count, WORD, GET_OREADRAW_MIN_COUNT(base), LEN_OREADRAW_MIN_COUNT(base))\
-macro(timeout, LONG, GET_OREADRAW_TIMEOUT(base), LEN_OREADRAW_TIMEOUT(base))\
-macro(reserved, WORD, GET_OREADRAW_RESERVED(base), LEN_OREADRAW_RESERVED(base))\
-macro(offset_high, LONG, GET_OREADRAW_OFFSET_HIGH(base), LEN_OREADRAW_OFFSET_HIGH(base))\
+do {\
+macro(fid, WORD, GET_OREADRAW_FID(base), LEN_OREADRAW_FID(base));\
+macro(offset, LONG, GET_OREADRAW_OFFSET(base), LEN_OREADRAW_OFFSET(base));\
+macro(max_count, WORD, GET_OREADRAW_MAX_COUNT(base), LEN_OREADRAW_MAX_COUNT(base));\
+macro(min_count, WORD, GET_OREADRAW_MIN_COUNT(base), LEN_OREADRAW_MIN_COUNT(base));\
+macro(timeout, LONG, GET_OREADRAW_TIMEOUT(base), LEN_OREADRAW_TIMEOUT(base));\
+macro(reserved, WORD, GET_OREADRAW_RESERVED(base), LEN_OREADRAW_RESERVED(base));\
+macro(offset_high, LONG, GET_OREADRAW_OFFSET_HIGH(base), LEN_OREADRAW_OFFSET_HIGH(base));\
+} while(0)
 
 #define OFF_OREADX_ANDX(base) 0
 #define PTR_OREADX_ANDX(base) (base + OFF_OREADX_ANDX(base))
@@ -980,14 +1018,16 @@ macro(offset_high, LONG, GET_OREADRAW_OFFSET_HIGH(base), LEN_OREADRAW_OFFSET_HIG
 #define SET_OREADX_OFFSET_HIGH(base, val) SET_LONG(base, OFF_OREADX_OFFSET_HIGH(base), val)
 #define LEN_OREADX(base) 24 
 #define ITR_OREADX(base, macro)\
-macro(andx, LONG, GET_OREADX_ANDX(base), LEN_OREADX_ANDX(base))\
-macro(fid, WORD, GET_OREADX_FID(base), LEN_OREADX_FID(base))\
-macro(offset, LONG, GET_OREADX_OFFSET(base), LEN_OREADX_OFFSET(base))\
-macro(max_count, WORD, GET_OREADX_MAX_COUNT(base), LEN_OREADX_MAX_COUNT(base))\
-macro(min_count, WORD, GET_OREADX_MIN_COUNT(base), LEN_OREADX_MIN_COUNT(base))\
-macro(reserved, LONG, GET_OREADX_RESERVED(base), LEN_OREADX_RESERVED(base))\
-macro(remaining, WORD, GET_OREADX_REMAINING(base), LEN_OREADX_REMAINING(base))\
-macro(offset_high, LONG, GET_OREADX_OFFSET_HIGH(base), LEN_OREADX_OFFSET_HIGH(base))\
+do {\
+macro(andx, LONG, GET_OREADX_ANDX(base), LEN_OREADX_ANDX(base));\
+macro(fid, WORD, GET_OREADX_FID(base), LEN_OREADX_FID(base));\
+macro(offset, LONG, GET_OREADX_OFFSET(base), LEN_OREADX_OFFSET(base));\
+macro(max_count, WORD, GET_OREADX_MAX_COUNT(base), LEN_OREADX_MAX_COUNT(base));\
+macro(min_count, WORD, GET_OREADX_MIN_COUNT(base), LEN_OREADX_MIN_COUNT(base));\
+macro(reserved, LONG, GET_OREADX_RESERVED(base), LEN_OREADX_RESERVED(base));\
+macro(remaining, WORD, GET_OREADX_REMAINING(base), LEN_OREADX_REMAINING(base));\
+macro(offset_high, LONG, GET_OREADX_OFFSET_HIGH(base), LEN_OREADX_OFFSET_HIGH(base));\
+} while(0)
 
 #define OFF_IREADX_ANDX(base) 0
 #define PTR_IREADX_ANDX(base) (base + OFF_IREADX_ANDX(base))
@@ -1046,17 +1086,19 @@ macro(offset_high, LONG, GET_OREADX_OFFSET_HIGH(base), LEN_OREADX_OFFSET_HIGH(ba
 #define SET_IREADX_RESERVED5(base, val) SET_WORD(base, OFF_IREADX_RESERVED5(base), val)
 #define LEN_IREADX(base) 24 
 #define ITR_IREADX(base, macro)\
-macro(andx, LONG, GET_IREADX_ANDX(base), LEN_IREADX_ANDX(base))\
-macro(remaining, WORD, GET_IREADX_REMAINING(base), LEN_IREADX_REMAINING(base))\
-macro(datacompactionmode, WORD, GET_IREADX_DATACOMPACTIONMODE(base), LEN_IREADX_DATACOMPACTIONMODE(base))\
-macro(reserved, WORD, GET_IREADX_RESERVED(base), LEN_IREADX_RESERVED(base))\
-macro(data_count, WORD, GET_IREADX_DATA_COUNT(base), LEN_IREADX_DATA_COUNT(base))\
-macro(data_offset, WORD, GET_IREADX_DATA_OFFSET(base), LEN_IREADX_DATA_OFFSET(base))\
-macro(reserved1, WORD, GET_IREADX_RESERVED1(base), LEN_IREADX_RESERVED1(base))\
-macro(reserved2, WORD, GET_IREADX_RESERVED2(base), LEN_IREADX_RESERVED2(base))\
-macro(reserved3, WORD, GET_IREADX_RESERVED3(base), LEN_IREADX_RESERVED3(base))\
-macro(reserved4, WORD, GET_IREADX_RESERVED4(base), LEN_IREADX_RESERVED4(base))\
-macro(reserved5, WORD, GET_IREADX_RESERVED5(base), LEN_IREADX_RESERVED5(base))\
+do {\
+macro(andx, LONG, GET_IREADX_ANDX(base), LEN_IREADX_ANDX(base));\
+macro(remaining, WORD, GET_IREADX_REMAINING(base), LEN_IREADX_REMAINING(base));\
+macro(datacompactionmode, WORD, GET_IREADX_DATACOMPACTIONMODE(base), LEN_IREADX_DATACOMPACTIONMODE(base));\
+macro(reserved, WORD, GET_IREADX_RESERVED(base), LEN_IREADX_RESERVED(base));\
+macro(data_count, WORD, GET_IREADX_DATA_COUNT(base), LEN_IREADX_DATA_COUNT(base));\
+macro(data_offset, WORD, GET_IREADX_DATA_OFFSET(base), LEN_IREADX_DATA_OFFSET(base));\
+macro(reserved1, WORD, GET_IREADX_RESERVED1(base), LEN_IREADX_RESERVED1(base));\
+macro(reserved2, WORD, GET_IREADX_RESERVED2(base), LEN_IREADX_RESERVED2(base));\
+macro(reserved3, WORD, GET_IREADX_RESERVED3(base), LEN_IREADX_RESERVED3(base));\
+macro(reserved4, WORD, GET_IREADX_RESERVED4(base), LEN_IREADX_RESERVED4(base));\
+macro(reserved5, WORD, GET_IREADX_RESERVED5(base), LEN_IREADX_RESERVED5(base));\
+} while(0)
 
 #define OFF_OCLOSE_FID(base) 0
 #define PTR_OCLOSE_FID(base) (base + OFF_OCLOSE_FID(base))
@@ -1070,8 +1112,10 @@ macro(reserved5, WORD, GET_IREADX_RESERVED5(base), LEN_IREADX_RESERVED5(base))\
 #define SET_OCLOSE_LAST_WRITE_TIME(base, val) SET_LONG(base, OFF_OCLOSE_LAST_WRITE_TIME(base), val)
 #define LEN_OCLOSE(base) 6 
 #define ITR_OCLOSE(base, macro)\
-macro(fid, WORD, GET_OCLOSE_FID(base), LEN_OCLOSE_FID(base))\
-macro(last_write_time, LONG, GET_OCLOSE_LAST_WRITE_TIME(base), LEN_OCLOSE_LAST_WRITE_TIME(base))\
+do {\
+macro(fid, WORD, GET_OCLOSE_FID(base), LEN_OCLOSE_FID(base));\
+macro(last_write_time, LONG, GET_OCLOSE_LAST_WRITE_TIME(base), LEN_OCLOSE_LAST_WRITE_TIME(base));\
+} while(0)
 
 #define OFF_NBTHEADER_TYPE(base) 0
 #define PTR_NBTHEADER_TYPE(base) (base + OFF_NBTHEADER_TYPE(base))
@@ -1090,9 +1134,11 @@ macro(last_write_time, LONG, GET_OCLOSE_LAST_WRITE_TIME(base), LEN_OCLOSE_LAST_W
 #define SET_NBTHEADER_LENGTH(base, val) SET_RWORD(base, OFF_NBTHEADER_LENGTH(base), val)
 #define LEN_NBTHEADER(base) 4 
 #define ITR_NBTHEADER(base, macro)\
-macro(type, BYTE, GET_NBTHEADER_TYPE(base), LEN_NBTHEADER_TYPE(base))\
-macro(flags, BYTE, GET_NBTHEADER_FLAGS(base), LEN_NBTHEADER_FLAGS(base))\
-macro(length, RWORD, GET_NBTHEADER_LENGTH(base), LEN_NBTHEADER_LENGTH(base))\
+do {\
+macro(type, BYTE, GET_NBTHEADER_TYPE(base), LEN_NBTHEADER_TYPE(base));\
+macro(flags, BYTE, GET_NBTHEADER_FLAGS(base), LEN_NBTHEADER_FLAGS(base));\
+macro(length, RWORD, GET_NBTHEADER_LENGTH(base), LEN_NBTHEADER_LENGTH(base));\
+} while(0)
 
 #define OFF_NBTSESSION_TYPE(base) 0
 #define PTR_NBTSESSION_TYPE(base) (base + OFF_NBTSESSION_TYPE(base))
@@ -1129,13 +1175,15 @@ macro(length, RWORD, GET_NBTHEADER_LENGTH(base), LEN_NBTHEADER_LENGTH(base))\
 #define END_NBTSESSION_SRC(base, end) SETLEN_NBTSESSION_SRC(base, end - GET_NBTSESSION_SRC(base))
 #define LEN_NBTSESSION(base) 6  + LEN_NBTSESSION_DST(base) + LEN_NBTSESSION_SRC(base)
 #define ITR_NBTSESSION(base, macro)\
-macro(type, BYTE, GET_NBTSESSION_TYPE(base), LEN_NBTSESSION_TYPE(base))\
-macro(flags, BYTE, GET_NBTSESSION_FLAGS(base), LEN_NBTSESSION_FLAGS(base))\
-macro(length, RWORD, GET_NBTSESSION_LENGTH(base), LEN_NBTSESSION_LENGTH(base))\
-macro(dst_type, BYTE, GET_NBTSESSION_DST_TYPE(base), LEN_NBTSESSION_DST_TYPE(base))\
-macro(dst, BLOB, GET_NBTSESSION_DST(base), LEN_NBTSESSION_DST(base))\
-macro(src_type, BYTE, GET_NBTSESSION_SRC_TYPE(base), LEN_NBTSESSION_SRC_TYPE(base))\
-macro(src, BLOB, GET_NBTSESSION_SRC(base), LEN_NBTSESSION_SRC(base))\
+do {\
+macro(type, BYTE, GET_NBTSESSION_TYPE(base), LEN_NBTSESSION_TYPE(base));\
+macro(flags, BYTE, GET_NBTSESSION_FLAGS(base), LEN_NBTSESSION_FLAGS(base));\
+macro(length, RWORD, GET_NBTSESSION_LENGTH(base), LEN_NBTSESSION_LENGTH(base));\
+macro(dst_type, BYTE, GET_NBTSESSION_DST_TYPE(base), LEN_NBTSESSION_DST_TYPE(base));\
+macro(dst, BLOB, GET_NBTSESSION_DST(base), LEN_NBTSESSION_DST(base));\
+macro(src_type, BYTE, GET_NBTSESSION_SRC_TYPE(base), LEN_NBTSESSION_SRC_TYPE(base));\
+macro(src, BLOB, GET_NBTSESSION_SRC(base), LEN_NBTSESSION_SRC(base));\
+} while(0)
 
 #define LEN_NBTSESSION_DST(base)	33
 #define LEN_NBTSESSION_SRC(base)	33

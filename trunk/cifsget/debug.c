@@ -1,49 +1,63 @@
 #include "includes.h"
 
-void smb_dump_msg(const char *fmt, ...) {
+int smb_log_level = SMB_LOG_NORMAL;
+
+void smb_log_msg(const char *fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
 	vfprintf(stderr, fmt, ap);
 	va_end(ap);
 }
 
-void smb_dump_buf(const char *name,  void *buf, size_t len) {
-	int i, j;
-	unsigned char *p = buf;
-	fprintf(stderr, "%s len:%d\n", name, len);
-	for (i=0;i<len;i+=16) {
-		for (j=0;j<16;j++) {
-			if ((i+j)<len) {
-				fprintf(stderr, "%02X ", p[i+j]);
-			} else{
-				fprintf(stderr, "   ");
-			}
+void smb_log_hex(void *buf, int len) {
+	int i;
+	char line[16*4+3], *p;
+	while (len > 0) {
+		p = line;
+		i = 0;
+		while (i < 16 && i < len) {
+			p += sprintf(p, "%02X ", ((unsigned char*)buf)[i]);
+			i++;
 		}
-		fprintf(stderr, "\t");
-		for (j=0;(j<16)&&(i+j)<len;j++) {
-			if (p[i+j]>31) {
-				fprintf(stderr, "%c", p[i+j]);
+		while (i < 16) {
+			*p++ = ' ';
+			*p++ = ' ';
+			*p++ = ' ';
+			i++;
+		}
+		*p++ = '\t';
+		i = 0;
+		while (i < 16 && i < len) {
+			if (((unsigned char*)buf)[i] >= ' ') {
+				*p++ = ((unsigned char*)buf)[i];
 			} else {
-				fprintf(stderr, ".");
+				*p++ = '.';
 			}
+			i++;
 		}
-		fprintf(stderr, "\n");
+		*p++ = '\n';
+		*p++ = '\0';
+		fputs(line, stderr);
+		
+		buf += 16;
+		len -= 16;
 	}
 }
 
-void smb_dump_header(char *p) {
-	PRINT_STRUCT(p, PACKET);
+void smb_log_trans(const char *name, smb_trans_p t) {
+	smb_log_debug("trans %s setup %d param %d data %d\n", name, t->setup_total, t->param_total, t->data_total);
+	if (smb_log_level >= SMB_LOG_NOISY) {
+		smb_log_msg("setup %d\n", t->setup_total);
+		smb_log_hex(t->setup, t->setup_total);
+		
+		smb_log_msg("param %d\n", t->param_total);
+		smb_log_hex(t->param, t->param_total);
+		
+		smb_log_msg("data %d\n", t->data_total);
+		smb_log_hex(t->data, t->data_total);
+	}
 }
 
-void smb_dump_packet(const char *name, char *p) {
-	smb_dump_msg("\npacket %s ", name);
-	smb_dump_header(p);
+void smb_log_flush(void) {
+	fflush(stderr);
 }
-
-void smb_dump_trans(const char *name, smb_trans_p t) {
-	smb_dump_msg("trans %s\n", name);
-	smb_dump_buf("setup", t->setup, t->setup_total);
-	smb_dump_buf("param", t->param, t->param_total);
-	smb_dump_buf("data", t->data, t->data_total);
-}
-

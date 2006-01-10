@@ -24,8 +24,10 @@ for l in sys.stdin.readlines():
 	elif x[0] == 'end':
 		print '#define', 'LEN_' + struct+'(base)', offset, offset_nc
 		print '#define', 'ITR_' + struct + '(base, macro)\\'
+		print 'do {\\'
 		for f, t in fields:
-			print 'macro(%s, %s, GET_%s_%s(base), LEN_%s_%s(base))\\'%(f.lower(), t, struct, f, struct, f)
+			print 'macro(%s, %s, GET_%s_%s(base), LEN_%s_%s(base));\\'%(f.lower(), t, struct, f, struct, f)
+		print '} while(0)'
 		print
 		struct = None
 	else:

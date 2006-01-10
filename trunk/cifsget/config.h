@@ -21,12 +21,4 @@
 #define SMB_LOCAL_CODEPAGE	"CP1251"
 #define SMB_DOS_CODEPAGE	"866"
 
-#ifdef DEBUG
-#define SMB_DUMP_PACKET
-#else
-#define NDEBUG
-#endif
-
-#define SMB_DUMP_FATAL
-
 #endif /* CONFIG_H */

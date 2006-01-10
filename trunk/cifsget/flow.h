@@ -25,9 +25,8 @@ typedef smb_flow_t *smb_flow_p;
 
 
 smb_flow_p smb_flow_new(void);
-
+void smb_flow_reset(smb_flow_p f);
 int smb_flow(smb_flow_p f, int delta);
-
 void smb_flow_free(smb_flow_p f);
 	
 #endif /* FLOW_H */

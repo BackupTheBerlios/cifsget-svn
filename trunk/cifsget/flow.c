@@ -15,17 +15,24 @@ static uint64_t smb_gettime(void) {
 	return (uint64_t)cur.tv_sec * 1000000 + cur.tv_usec;
 }
 
-smb_flow_p smb_flow_new(void) {
-	smb_flow_p f;
-	NEW_STRUCT(f);
+void smb_flow_reset(smb_flow_p f) {
+	assert(f);
+	ZERO_STRUCTP(f);
 	f->interval = DEFAULT_INTERVAL;
 	f->start = smb_gettime();
 	f->a = f->b = f->c = f->start;
+}
+
+smb_flow_p smb_flow_new(void) {
+	smb_flow_p f;
+	NEW_STRUCT(f);
+	smb_flow_reset(f);
 	return f;
 }
 
 int smb_flow(smb_flow_p f, int delta) {
 	uint64_t t, x, w;
+	assert(f);
 	
 	f->total += delta;	
 	f->d += delta;
@@ -65,3 +72,4 @@ int smb_flow(smb_flow_p f, int delta) {
 void smb_flow_free(smb_flow_p f) {
 	free(f);
 }
+

@@ -48,9 +48,9 @@ int smb_negotiate(smb_connect_p c) {
 	c->capabilities = GET_INEGOT_CAPABILITIES(p);
 	c->server_time_zone = GET_INEGOT_SERVERTIMEZONE(p);
 	
-#ifdef DEBUG
-	PRINT_STRUCT(p, INEGOT);
-#endif	
+
+	smb_log_struct(p, INEGOT);
+
 	return 0;
 }
 
@@ -72,9 +72,9 @@ int smb_sessionsetup(smb_connect_p c) {
 	SET_OSESSIONSETUP_RESERVED(p, 0);
 	SET_OSESSIONSETUP_CAPABILITIES(p, CAP_STATUS32 |CAP_RAW_MODE|CAP_LARGE_FILES);
 
-#ifdef DEBUG
-	PRINT_STRUCT(p, OSESSIONSETUP);
-#endif
+
+	smb_log_struct(p, OSESSIONSETUP);
+
 		
 	p = PTR_PACKET_B(o);
 	
@@ -87,10 +87,10 @@ int smb_sessionsetup(smb_connect_p c) {
 		
 	if (smb_request(c)) return -1;
 	
-#ifdef DEBUG
+
 	p = GET_PACKET_W(c->i);
-	PRINT_STRUCT(p, ISESSIONSETUP);
-#endif	
+	smb_log_struct(p, ISESSIONSETUP);
+
 	SET_PACKET_UID(c->o, GET_PACKET_UID(c->i));
 	return 0;
 }
@@ -110,9 +110,9 @@ int smb_tree_connect(smb_connect_p c, const char *server, const char *share) {
 	SET_OTREECONNECT_FLAGS(p, 0);
 	SET_OTREECONNECT_PWDLEN(p, 0);
 
-#ifdef DEBUG
-	PRINT_STRUCT(p, OTREECONNECT);
-#endif			
+
+	smb_log_struct(p, OTREECONNECT);
+
 	p = GET_PACKET_B(o);
 	PUSH_FORMAT(p, "\\\\%s\\%s", server, share);
 	PUSH_STRING(p, "?????");
@@ -124,10 +124,10 @@ int smb_tree_connect(smb_connect_p c, const char *server, const char *share) {
 	
 	SET_PACKET_TID(c->o, tid);
 	
-#ifdef DEBUG
+
 	p = GET_PACKET_W(c->i);
-	PRINT_STRUCT(p, ITREECONNECT);
-#endif	
+	smb_log_struct(p, ITREECONNECT);
+
 	return tid;
 }
 
@@ -209,9 +209,8 @@ static int smb_read_andx_send(smb_connect_p c, int fid, int count, uint64_t offs
 	SET_OREADX_MIN_COUNT(w, 0);
 	SET_OREADX_RESERVED(w, 0);
 	SET_OREADX_REMAINING(w, 0);
-#ifdef DEBUG
-	PRINT_STRUCT(w, OREADX);
-#endif
+
+	smb_log_struct(w, OREADX);
 	return smb_send(c);
 }
 
@@ -229,9 +228,8 @@ static int smb_read_raw_send(smb_connect_p c, int fid, int count, uint64_t offse
 	SET_OREADRAW_RESERVED(w, 0);	
 	SET_OREADRAW_OFFSET(w, offset);
 	SET_OREADRAW_OFFSET_HIGH(w, offset>>32);
-#ifdef DEBUG
-	PRINT_STRUCT(w, OREADRAW);
-#endif
+
+	smb_log_struct(w, OREADRAW);
 	return smb_send(c);
 }
 
@@ -239,9 +237,9 @@ static size_t smb_read_andx_get(smb_connect_p c, void **buf) {
 	char *w;
 	int len, off;
 	w = PTR_PACKET_W(c->i);
-#ifdef DEBUG
-	PRINT_STRUCT(w, IREADX);
-#endif
+
+	smb_log_struct(w, IREADX);
+
 	len = GET_IREADX_DATA_COUNT(w);
 	off = GET_IREADX_DATA_OFFSET(w);
 	*buf = PTR_PACKET_MAGIC(c->i) + off;

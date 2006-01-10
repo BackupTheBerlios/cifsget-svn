@@ -6,6 +6,8 @@
 #endif
 #endif
 
+int smb_recv_skip_sock(int sock, int size);
+
 static int smb_check_packet(char *p, int size) {
 	if (size < OFF_PACKET_WC(p) + LEN_PACKET_WC(p)) return -1;
 	if (GET_PACKET_MAGIC(p) != SMB_MAGIC) return -1;
@@ -40,21 +42,17 @@ int smb_nbt_session(int sock, const char *name) {
 	SET_NBTSESSION_DST_TYPE(b, 0x20);
 	smb_nbt_name(PTR_NBTSESSION_SRC(b), "LOCALHOST"); // $)
 	smb_nbt_name(PTR_NBTSESSION_DST(b), name);
-#ifdef DEBUG
-	PRINT_STRUCT(b, NBTSESSION);
-#endif
+	
+	smb_log_struct(b, NBTSESSION);
+	
 	if (send(sock, b, sizeof(b), 0) != sizeof(b)) return -1;
 	if (recv(sock, h, sizeof(h), 0) != sizeof(h)) return -1;
-#ifdef DEBUG
-	PRINT_STRUCT(h, NBTHEADER);
-	unsigned char buf;
-	int i;	
-	i = GET_NBTHEADER_LENGTH(h);
-	while(i--) {
-		if (recv(sock, &buf, 1, 0) != 1) break;
-		printf("%02X", buf);
+	
+	smb_log_struct(h, NBTHEADER);
+	
+	if (GET_NBTHEADER_LENGTH(h)) {
+		smb_recv_skip_sock(sock, GET_NBTHEADER_LENGTH(h));
 	}
-#endif
 	if (GET_NBTHEADER_TYPE(h) != 0x82) return -1;
 	return 0;
 }
@@ -119,6 +117,12 @@ int smb_connected(smb_connect_p c) {
 size_t smb_send_raw(smb_connect_p c, void *buf, size_t len) {
 	int r;
 	char *p = buf;
+	
+	if (!c->connected) {
+		errno = ENOTCONN;
+		return -1;
+	}
+	
 	while (len) {
 		r = send(c->sock, p, len, 0);
 		if (r < 0) {
@@ -134,14 +138,18 @@ size_t smb_send_raw(smb_connect_p c, void *buf, size_t len) {
 
 int smb_send(smb_connect_p c) {
 	int len, r;
-	char *p;	
+	char *p;
+
+	if (!c->connected) {
+		errno = ENOTCONN;
+		return -1;
+	}
 	
 	len = LEN_PACKET(c->o);
 	SET_PACKET_LENGTH(c->o, len - 4);
-	
-#ifdef SMB_DUMP_PACKET
-	smb_dump_packet("send", c->o);
-#endif
+
+	smb_log_packet("send", c->o);
+
 	p = c->o;
 	while (len) {
 		r = send(c->sock, p, len, 0);
@@ -155,20 +163,32 @@ int smb_send(smb_connect_p c) {
 	return 0;
 }
 
-int smb_recv_skip(smb_connect_p c, int size) {
-	unsigned char buf; // %)
-	for (int i = 0 ; i < size ; i++) {
-		if (recv(c->sock, &buf, 1, 0) != 1) {
-			c->connected = 0;
-			return -1;
-		}
-#ifdef DEBUG
-		printf("%02X", buf);
-#endif
+
+int smb_recv_skip_sock(int sock, int size) {
+	unsigned char buf;
+	int res;	
+
+	smb_log_debug("skip %d bytes\n", size);
+	while (size > 0) {
+		res = recv(sock, &buf, 1, MSG_WAITALL);
+		if (res == 0) continue;
+		if (res < 0) return -1;
+		size--;
+		smb_log_noisy("%02X ", buf);
 	}
-#ifdef DEBUG
-	printf("\n");
-#endif
+	smb_log_noisy("\n", size);
+	return 0;
+}
+
+int smb_recv_skip(smb_connect_p c, int size) {
+	if (!c->connected) {
+		errno = ENOTCONN;
+		return -1;
+	}
+	if (smb_recv_skip_sock(c->sock, size)) {
+		c->connected = 0;
+		return -1;
+	}
 	return 0;
 }
 
@@ -176,6 +196,12 @@ int smb_recv_size(smb_connect_p c) {
 	uint32_t size;
 	char *p;
 	int l, r, type;
+
+	if (!c->connected) {
+		errno = ENOTCONN;
+		return -1;
+	}
+
 	do {
 		p = (char*)&size;
 		l = 4;
@@ -192,9 +218,7 @@ int smb_recv_size(smb_connect_p c) {
 		type = size >> 24;
 		size &= 0x0000FFFF; // FIXME
 		if (type && size) {
-#ifdef DEBUG
-			smb_dump_msg("skip\ttype: %d size: %d\n", type, size);
-#endif
+			smb_log_debug("skip type: %d size: %d\n", type, size);
 			smb_recv_skip(c, size);
 		}
 	} while (type);
@@ -205,7 +229,7 @@ size_t smb_recv_raw(smb_connect_p c, void *buf, size_t len) {
 	int size;
 	int r, l;
 	char *p;
-
+	
 	size = smb_recv_size(c);
 
 	if (size < 0) {
@@ -213,7 +237,7 @@ size_t smb_recv_raw(smb_connect_p c, void *buf, size_t len) {
 	}
 	
 	if (size > len) {
-		smb_dump_msg("smb_recv_raw: buffer to small %d packet size %d\n", len, size);
+		smb_log_error("smb_recv_raw: buffer to small %d packet size %d\n", len, size);
 		smb_recv_skip(c, size);
 		errno = ENOMEM;		
 		return -1;
@@ -231,14 +255,19 @@ size_t smb_recv_raw(smb_connect_p c, void *buf, size_t len) {
 		l -= r;
 		p += r;
 	}
-#ifdef SMB_DUMP_PACKET
-	smb_dump_msg("recv_raw size: %d\n", size);
-#endif	
+
+	smb_log_msg("recv_raw size: %d\n", size);
+
 	return size;
 }
 
 int smb_recv(smb_connect_p c) {
 	int size;
+
+	if (!c->connected) {
+		errno = ENOTCONN;
+		return -1;
+	}	
 
 	c->i_len = 4;
 	c->i_done = 0;
@@ -258,6 +287,7 @@ int smb_recv(smb_connect_p c) {
 			} else {
 				c->i_len += size;
 				if (c->i_len > c->i_size) {
+					smb_log_error("smb_recv: buffer to small %d packet size %d\n", c->i_len, c->i_size);
 					smb_recv_skip(c, size);
 					errno = ENOMEM;
 					return -1;
@@ -267,16 +297,16 @@ int smb_recv(smb_connect_p c) {
 	} while (c->i_len != c->i_done);	
 	
 	if (smb_check_packet(c->i, c->i_len)) {
-#ifdef SMB_DUMP_FATAL
-		smb_dump_buf("incorect packet", c->i, c->i_len);
-#endif
+		smb_log_error("incorect packet %d bytes\n", c->i_len);
+		smb_log_hex_noisy(c->i, c->i_len);
+		c->connected = 0;
 		errno = EIO;
 		return -1;
 	}
 	
-#ifdef SMB_DUMP_PACKET
-	smb_dump_packet("recv", c->i);
-#endif
+
+	smb_log_packet("recv", c->i);
+
 	return 0;
 }
 
@@ -289,11 +319,13 @@ int smb_request(smb_connect_p c) {
 	if (smb_send(c)) return -1;
 	if (smb_recv(c)) return -1;
 	if (GET_PACKET_COMMAND(c->i) != GET_PACKET_COMMAND(c->o)) {
-#ifdef SMB_DUMP_FATAL
-		smb_dump_msg("sync error %d %d\n", GET_PACKET_COMMAND(c->i), GET_PACKET_COMMAND(c->o));
-		smb_dump_packet("i", c->i);
-		smb_dump_packet("o", c->o);
-#endif
+
+		smb_log_error("sync error %d %d\n", GET_PACKET_COMMAND(c->i), GET_PACKET_COMMAND(c->o));
+		smb_log_packet("i", c->i);
+		smb_log_packet("o", c->o);
+
+		c->connected = 0;
+
 		errno = EIO;
 		return -1;
 	}
@@ -307,6 +339,11 @@ int smb_request(smb_connect_p c) {
 
 int smb_recv_async(smb_connect_p c) {
 	int size, type;
+
+	if (!c->connected) {
+		errno = ENOTCONN;
+		return -1;
+	}	
 	
 	/* stage1: try recv size field */
 	if (c->i_len == c->i_done) {
@@ -314,7 +351,7 @@ int smb_recv_async(smb_connect_p c) {
 		c->i_done = 0;
 	}
 	
-	if (c->i_done > 0) {
+	if (c->i_done >= 0) {
 		size = recv(c->sock, c->i + c->i_done, c->i_len - c->i_done, MSG_DONTWAIT);
 	} else {
 		size = -c->i_done;
@@ -335,6 +372,8 @@ int smb_recv_async(smb_connect_p c) {
 			/* recv body */
 			c->i_len += size;
 			if (c->i_len > c->i_size) {
+				smb_log_error("smb_recv_async: buffer to small %d packet size %d\n", c->i_len, c->i_size);
+				smb_recv_skip(c, size);
 				errno = ENOMEM;
 				return -1;
 			}
@@ -344,6 +383,6 @@ int smb_recv_async(smb_connect_p c) {
 	if (c->i_done == c->i_len) return 0;
 	
 	errno = EAGAIN;
-	return -1;	
+	return -1;
 }
 

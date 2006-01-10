@@ -1,46 +1,41 @@
 CFLAGS=-g -std=c99 -Wall
-OBJECTS=transport.o proto.o codepage.o uri.o transact.o find.o rap.o flow.o mirror.o
+OBJECTS=transport.o proto.o codepage.o uri.o transact.o find.o rap.o flow.o mirror.o human.o debug.o
 PREFIX=${HOME}
 
 ifdef WINDOWS
 	CC=i586-mingw32msvc-gcc
 	CFLAGS+=-DWINDOWS
 	LDFLAGS+=-lwsock32
-	SUFFIX=.exe
+	SFX=.exe
 endif
 
-OBJECTS+=debug.o
-
-ifdef DEBUG
-	CFLAGS+=-DDEBUG
-endif
-
-TARGET=cifsget${SUFFIX}
-
-all: ${TARGET}
+all: cifsget
 
 install: all
-	cp ${TARGET} ${PREFIX}/bin/
+	cp cifsget ${PREFIX}/bin/
 
-.c.o:
+.c.o: 
 	${CC} ${CFLAGS} -c -o $@ $<
 
 struct.h: struct.sgs sgs
 	./sgs < $< > $@
 
-${TARGET}: cifsget.o ${OBJECTS}
+cifsget: cifsget.o ${OBJECTS}
 	${CC} -o $@ $^ ${LDFLAGS}
 
 cifsmirror: cifsmirror.o ${OBJECTS}
-	${CC} -o $@ $^ ${LDFLAGS}	
+	${CC} -o $@ $^ ${LDFLAGS}
 	
 clean:
-	rm -f *.o ${TARGET} tags fusesmb .depends
+	rm -f *.o cifsmirror cifsget tags fusesmb
 
-.depends: *.c *.h
+distclean: clean
+	rm -f .depends
+
+.depends: includes.h
 	${CC} ${CFLAGS} -M *.c > $@
 
-dist: clean
+dist: distclean
 	cd .. ;	tar czf "cifsget_`date +%Y-%m-%d_%H%M`.tgz" cifsget
 
 fusesmb: transport.o proto.o transact.o debug.o find.o rap.o fusesmb.o uri.o codepage.o

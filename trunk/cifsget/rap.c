@@ -62,10 +62,10 @@ int smb_share_enum(smb_connect_p c, smb_node_enum_p e) {
 		return -1;
 	}
 
-#ifdef DEBUG
-	smb_dump_trans("shareenum", &e->t);
-	PRINT_STRUCT(e->t.param, RAPENUM);
-#endif
+
+	smb_log_trans("shareenum", &e->t);
+	smb_log_struct(e->t.param, RAPENUM);
+
 	
 	e->cur = e->t.data;
 	e->count = GET_RAPENUM_ENTRY_COUNT(e->t.param);
@@ -88,10 +88,10 @@ int smb_server_enum(smb_connect_p c, smb_node_enum_p e, const char *domain) {
 		return -1;
 	}
 
-#ifdef DEBUG
-	smb_dump_trans("serverenum", &e->t);
-	PRINT_STRUCT(e->t.param, RAPENUM);
-#endif
+
+	smb_log_trans("serverenum", &e->t);
+	smb_log_struct(e->t.param, RAPENUM);
+
 	e->cur = e->t.data;
 	e->count = GET_RAPENUM_ENTRY_COUNT(e->t.param);
 	e->conv = GET_RAPENUM_CONVERT(e->t.param);
@@ -115,10 +115,9 @@ int smb_domain_enum(smb_connect_p c, smb_node_enum_p e) {
 		return -1;
 	}
 
-#ifdef DEBUG
-	smb_dump_trans("domainenum", &e->t);
-	PRINT_STRUCT(e->t.param, RAPENUM);
-#endif
+	smb_log_trans("domainenum", &e->t);
+	smb_log_struct(e->t.param, RAPENUM);
+
 	e->cur = e->t.data;
 	e->count = GET_RAPENUM_ENTRY_COUNT(e->t.param);
 	e->conv = GET_RAPENUM_CONVERT(e->t.param);

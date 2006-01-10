@@ -56,6 +56,7 @@
 #include "codepage.h"
 #include "flow.h"
 #include "mirror.h"
+#include "human.h"
 
 #endif /* INCLUDES_H */
 
