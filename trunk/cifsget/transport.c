@@ -256,7 +256,7 @@ size_t smb_recv_raw(smb_connect_p c, void *buf, size_t len) {
 		p += r;
 	}
 
-	smb_log_msg("recv_raw size: %d\n", size);
+	smb_log_debug("recv_raw size: %d\n", size);
 
 	return size;
 }
