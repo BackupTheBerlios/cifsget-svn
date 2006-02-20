@@ -24,16 +24,20 @@ int smb_find_first_req(smb_connect_p c, const char *mask) {
 	w = PTR_PACKET_W(o);
 	b = PTR_PACKET_B(o);
 	
+	SET_OFINDFIRST_SEARCH_ATTRIBUTES(b, 0x37);
 	SET_OFINDFIRST_SEARCH_COUNT(b, -1);
-	SET_OFINDFIRST_SEARCH_ATTRIBUTES(b, 0x37);	
 	SET_OFINDFIRST_FLAGS(b, FLAG_TRANS2_FIND_CLOSE_IF_END);
 	SET_OFINDFIRST_INFORMATION_LEVEL(b, SMB_FIND_DIRECTORY_INFO);
+	SET_OFINDFIRST_SEARCH_STORAGE_TYPE(b, 0);
 	strcpy(PTR_OFINDFIRST_MASK(b), mask);
 
 	SETLEN_PACKET_B(o, LEN_OFINDFIRST(b));
 
 	SET_OTRANS_PARAM_COUNT(w, LEN_PACKET_B(o));
 	SET_OTRANS_TOTAL_PARAM_COUNT(w, LEN_PACKET_B(o));
+	
+	smb_log_struct(b, OFINDFIRST);
+
 	return 0;
 }
 
@@ -55,6 +59,9 @@ int smb_find_next_req(smb_connect_p c, int sid) {
 	
 	SET_OTRANS_PARAM_COUNT(w, LEN_PACKET_B(o));
 	SET_OTRANS_TOTAL_PARAM_COUNT(w, LEN_PACKET_B(o));
+	
+	smb_log_struct(b, OFINDNEXT);
+
 	return 0;
 }
 
@@ -98,22 +105,20 @@ int smb_find_first(smb_connect_p c, smb_find_p f, const char *mask) {
 
 	if (smb_trans_alloc(&f->t)) return -1;
 	
-	if (smb_trans_request(c, &f->t)) {		
+	if (smb_trans_request(c, &f->t)) {
 		smb_trans_free(&f->t);
 		errno = ENOENT;
 		return -1;
 	}
 
-
 	smb_log_trans("findfirst", &f->t);
 	smb_log_struct(f->t.param, IFINDFIRST);
-
 
 	f->end = GET_IFINDFIRST_END_OF_SEARCH(f->t.param);
 	f->sid = GET_IFINDFIRST_SID(f->t.param);
 	f->cur = f->t.data;
 	f->count = GET_IFINDFIRST_SEARCH_COUNT(f->t.param);
-
+	
 	return 0;
 }
 

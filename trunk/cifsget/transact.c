@@ -13,8 +13,10 @@ void smb_trans_req(smb_connect_p c, int command, char *name, int setup_count, ..
 	SET_OTRANS_RESERVED(w, 0);
 	SET_OTRANS_SETUP_COUNT(w, setup_count);
 	va_start(st, setup_count);
+	char *s = PTR_OTRANS_SETUP(w);
 	for (int i = 0 ; i < setup_count ; i++) {
-		SET_WORD(PTR_OTRANS_SETUP(w), i*2, va_arg(st, int));
+		int x = va_arg(st, int);
+		SET_WORD(s, i*2, x);
 	}
 	va_end(st);
 	SETLEN_PACKET_W(o, LEN_OTRANS(w));
@@ -166,6 +168,7 @@ int smb_trans_recv(smb_connect_p c, smb_trans_p t) {
 
 
 int smb_trans_request(smb_connect_p c, smb_trans_p t) {
+	smb_log_struct(PTR_PACKET_W(c->o), OTRANS);
 	if (smb_send(c)) return -1;
 	if (smb_trans_recv(c, t)) return -1;
 	return 0;

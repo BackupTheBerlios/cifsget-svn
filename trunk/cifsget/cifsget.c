@@ -7,10 +7,11 @@ void usage() {
   SHORT:\t host/share/path/NAME\n\
   NAME: (file|dir|mask)\n\
   \n\
-  -l                    list\n\
+  -l                    list\n\  
   -o name		write to file or dir name, instead of original name\n\
+  -d			chdir\n\
   -s <int>[k|m|g|t]     limit download speed\n\
-  -d <int>		log level");
+  -v <int>              verbose level\n");
 	exit(2);
 }
 
@@ -243,8 +244,13 @@ int main(int argc, char * const argv[]) {
 		if (!strcmp(argv[i], "-l")) {
 			action = 'l';
 		} else if (!strcmp(argv[i], "-d")) {
-			action = 'd';
-		} else if (!strcmp(argv[i], "-s"))  {
+			i++;
+			if (i == argc) {
+				fprintf(stderr, "-d: parameter needed\n");
+				break;
+			}
+			if (chdir(argv[i])) perror(argv[i]);
+		} else if (!strcmp(argv[i], "-s")) {
 			i++;
 			if (i == argc) {
 				fprintf(stderr, "-s: parameter needed\n");
@@ -258,6 +264,13 @@ int main(int argc, char * const argv[]) {
 				break;
 			}
 			out = argv[i];
+		} else if (!strcmp(argv[i], "-v")) {
+			i++;
+			if (i == argc) {
+				fprintf(stderr, "-v: parameter needed\n");
+				break;
+			}
+			smb_log_level = atoi(argv[i]);
 		} else {
 			if (smb_uri_parse(&uri, argv[i])) continue;
 			
