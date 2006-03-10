@@ -2,17 +2,18 @@
 
 void usage() {
 	printf("usage: cifsget [OPTION]... (URI|UNC|SHORT)...\n\
-  URI:\t(smb|file|cifs)://host/share/path/NAME\n\
-  UNC:\t \\\\host\\share\\path\\NAME\n\
-  SHORT:\t host/share/path/NAME\n\
-  NAME: (file|dir|mask)\n\
+  \n\
+  URI:    (smb|file|cifs)://host/share/path/NAME\n\
+  UNC:    \\\\host\\share\\path\\NAME\n\
+  SHORT:  host/share/path/NAME\n\
+  NAME:   (file|dir|mask)\n\
   \n\
   -l                    list directory contents\n\
   -o file		output file\n\
   -O dir		output directory\n\
   -s <int>[k|m|g|t]     limit download speed\n\
-  -d <int>              debug level\n");
-	exit(2);
+  -h                    show this message\n\
+  -d [0-6]              debug level\n");
 }
 
 smb_flow_p flow;
@@ -67,7 +68,7 @@ int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const 
 
 	rem = di->file_size - off;
 
-	int ll;
+	int ll = 0;
 	while (rem > 0) {
 		len  = (rem < sizeof(buf))?rem:sizeof(buf);
 		res = smb_read(c, fid, buf, len, off);
@@ -330,6 +331,10 @@ int smb_get(char *arg) {
 }
 
 int main(int argc, char * const argv[]) {
+	if (argc == 1) {
+		usage();
+		return 0;
+	}	
 #ifdef WINDOWS
 	WSADATA wsaData;
 	if (WSAStartup(MAKEWORD(2, 0), &wsaData )) {
@@ -339,9 +344,9 @@ int main(int argc, char * const argv[]) {
 	iconv_init();
 	
 	flow = smb_flow_new();	
-
+	
 	while (1) {
-		int o = getopt(argc, argv, "-l:d:s:o:O:");
+		int o = getopt(argc, argv, "-l:s:o:O:d:h");
 		if (o == -1) break;
 		switch (o) {
 			case 'd':
@@ -359,8 +364,12 @@ int main(int argc, char * const argv[]) {
 			case 'l':
 				smb_ls(optarg);
 				break;
-			case 1:					
+			case 1:
 				smb_get(optarg);
+				break;
+			case 'h':
+				usage();
+				break;
 		}
 	}
 	
