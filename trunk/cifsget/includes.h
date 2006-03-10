@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#include <getopt.h>
+
 #ifdef WINDOWS
 
 #include <winsock.h>
