@@ -14,6 +14,7 @@ typedef struct smb_dirinfo_s {
 typedef smb_dirinfo_t *smb_dirinfo_p;
 
 typedef struct smb_find_s {
+	smb_connect_p c;
 	smb_trans_t t;
 	int sid;
 	int end;
@@ -28,10 +29,15 @@ int smb_find_first_req(smb_connect_p c, const char *mask);
 int smb_find_next_req(smb_connect_p c, int sid);
 int smb_find_close_req(smb_connect_p c, int sid);
 
-int smb_find_first(smb_connect_p c, smb_find_p f, const char *mask);
-int smb_find_next(smb_connect_p c, smb_find_p f, smb_dirinfo_p d);
-int smb_find_close(smb_connect_p c, smb_find_p f);
+int smb_find_first(smb_connect_p c, const char *mask, smb_find_p f);
+int smb_find_next(smb_find_p f, smb_dirinfo_p d);
+int smb_find_close(smb_find_p f);
+
+smb_find_p smb_find_first2(smb_connect_p c, const char *mask);
+smb_dirinfo_p smb_find_next2(smb_find_p f);
+int smb_find_close2(smb_find_p f);
 
 int smb_info(smb_connect_p c, const char *name, smb_dirinfo_p d);
+smb_dirinfo_p smb_info2(smb_connect_p c, const char *name);
 
 #endif /* FIND_H */

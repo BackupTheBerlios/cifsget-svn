@@ -45,6 +45,9 @@ void smb_log_hex(void *buf, int len);
 #define smb_log(level, ...)	if (smb_log_level >= level) smb_log_msg(__VA_ARGS__)
 
 #define smb_log_error(...)  	smb_log(SMB_LOG_ERROR, __VA_ARGS__)
+#define smb_log_warning(...)  	smb_log(SMB_LOG_WARNING, __VA_ARGS__)
+#define smb_log_normal(...)  	smb_log(SMB_LOG_NORMAL, __VA_ARGS__)
+#define smb_log_verbose(...)  	smb_log(SMB_LOG_VERBOSE, __VA_ARGS__)
 #define smb_log_debug(...)  	smb_log(SMB_LOG_DEBUG, __VA_ARGS__)
 #define smb_log_noisy(...)  	smb_log(SMB_LOG_NOISY, __VA_ARGS__)
 

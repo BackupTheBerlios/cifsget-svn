@@ -158,7 +158,7 @@ int smb_tree_disconnect(smb_connect_p c, int tid) {
 
 int smb_open(smb_connect_p c, const char *name, int mode) {
 	char *o = c->o, *p;
-		
+	
 	SET_PACKET_COMMAND(o, SMBopen);
 			
 	p = PTR_PACKET_W(o);
@@ -178,7 +178,9 @@ int smb_open(smb_connect_p c, const char *name, int mode) {
 
 int smb_close(smb_connect_p c, int fid) {
 	char *o = c->o, *w;
-		
+	
+	if (!c->connected) return -1;
+	
 	SET_PACKET_COMMAND(o, SMBclose);
 	w = PTR_PACKET_W(o);
 	SET_OCLOSE_FID(w, fid);
@@ -225,7 +227,7 @@ static int smb_read_raw_send(smb_connect_p c, int fid, int count, uint64_t offse
 	SET_OREADRAW_MAX_COUNT(w, count);
 	SET_OREADRAW_MIN_COUNT(w, 0);
 	SET_OREADRAW_TIMEOUT(w, 0);
-	SET_OREADRAW_RESERVED(w, 0);	
+	SET_OREADRAW_RESERVED(w, 0);
 	SET_OREADRAW_OFFSET(w, offset);
 	SET_OREADRAW_OFFSET_HIGH(w, offset>>32);
 
@@ -307,6 +309,7 @@ smb_connect_p smb_connect2(const char *server) {
 	c = smb_connect(server);
 	if (!c) return NULL;
 	if (smb_negotiate(c) || smb_sessionsetup(c)) {
+		smb_log_error("connection to %s failed: %s\n", server, strerror(errno));
 		smb_disconnect(c);
 		return NULL;
 	}
@@ -315,11 +318,10 @@ smb_connect_p smb_connect2(const char *server) {
 
 smb_connect_p smb_connect3(const char *server, const char *share) {
 	smb_connect_p c;
-	c = smb_connect(server);
+	c = smb_connect2(server);
 	if (!c) return NULL;
-	if (smb_negotiate(c) ||	
-			smb_sessionsetup(c) || 
-			(smb_tree_connect(c, server, share) < 0)) {
+	if ( smb_tree_connect(c, server, share) < 0) {
+		smb_log_error("connection to \\\\%s\\%s failed: %s\n", server, share, strerror(errno));
 		smb_disconnect(c);
 		return NULL;
 	}

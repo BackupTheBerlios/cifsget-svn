@@ -74,32 +74,9 @@ int smb_find_close_req(smb_connect_p c, int sid) {
 	return 0;
 }
 
-int smb_info(smb_connect_p c, const char *name, smb_dirinfo_p d) {
-	smb_trans_t t;
-	smb_find_first_req(c, name);
-	if (smb_trans_alloc(&t)) return -1;
-	if (smb_trans_request(c, &t)) {
-		smb_trans_free(&t);
-		return -1;	
-	}	
-
-		smb_log_trans("info", &t);
-		smb_log_struct(t.param, IFINDFIRST);
-
-	if (GET_IFINDFIRST_SEARCH_COUNT(t.param) != 1) {
-		smb_trans_free(&t);
-		if (!GET_IFINDFIRST_END_OF_SEARCH(t.param)) {
-			smb_find_close_req(c, GET_IFINDFIRST_SID(t.param));
-			smb_request(c);
-		}
-		return -1;
-	}
-	smb_build_dirinfo(d, t.data);
-	smb_trans_free(&t);
-	return 0;
-}
-
-int smb_find_first(smb_connect_p c, smb_find_p f, const char *mask) {
+int smb_find_first(smb_connect_p c, const char *mask, smb_find_p f) {
+	
+	f->c = c;
 	
 	smb_find_first_req(c, mask);
 
@@ -122,14 +99,14 @@ int smb_find_first(smb_connect_p c, smb_find_p f, const char *mask) {
 	return 0;
 }
 
-int smb_find_next(smb_connect_p c, smb_find_p f, smb_dirinfo_p d) {
+int smb_find_next(smb_find_p f, smb_dirinfo_p d) {
 loop:
 	if (f->count == 0) {
 		if (f->end) return 1;
-		smb_find_next_req(c, f->sid);
+		smb_find_next_req(f->c, f->sid);
 		
-		if (smb_send(c)) return -1;
-		if (smb_trans_recv(c, &f->t)) return -1;
+		if (smb_send(f->c)) return -1;
+		if (smb_trans_recv(f->c, &f->t)) return -1;
 
 
 		smb_log_trans("findnext", &f->t);
@@ -148,12 +125,76 @@ loop:
 	return 0;
 }
 
-int smb_find_close(smb_connect_p c, smb_find_p f) {
+int smb_find_close(smb_find_p f) {
 	smb_trans_free(&f->t);
 	if (!f->end) {
-		smb_find_close_req(c, f->sid);
-		if (smb_request(c)) return -1;
+		smb_find_close_req(f->c, f->sid);
+		if (smb_request(f->c)) return -1;
 	}
 	return 0;
 }
 
+
+smb_find_p smb_find_first2(smb_connect_p c, const char *mask) {
+	smb_find_p f;
+	NEW_STRUCT(f);
+	if (smb_find_first(c, mask, f)) {
+		FREE_STRUCT(f);
+		return NULL;
+	}
+	return f;
+}
+
+smb_dirinfo_p smb_find_next2(smb_find_p f) {
+	smb_dirinfo_p d;
+	NEW_STRUCT(d);
+	if (smb_find_next(f, d)) {
+		FREE_STRUCT(d);
+		return NULL;
+	}
+	return d;
+}
+
+int smb_find_close2(smb_find_p f) {
+	smb_find_close(f);
+	FREE_STRUCT(f);
+	return 0;
+}
+
+
+int smb_info(smb_connect_p c, const char *name, smb_dirinfo_p d) {
+	smb_trans_t t;
+	smb_find_first_req(c, name);
+	if (smb_trans_alloc(&t)) return -1;
+	if (smb_trans_request(c, &t)) {
+		smb_trans_free(&t);
+		return -1;	
+	}	
+
+	smb_log_trans("info", &t);
+	smb_log_struct(t.param, IFINDFIRST);
+
+	if (GET_IFINDFIRST_SEARCH_COUNT(t.param) != 1) {
+		smb_trans_free(&t);
+		if (!GET_IFINDFIRST_END_OF_SEARCH(t.param)) {
+			smb_find_close_req(c, GET_IFINDFIRST_SID(t.param));
+			smb_request(c);
+		}
+		errno = EMLINK;
+		return -1;
+	}
+	
+	smb_build_dirinfo(d, t.data);
+	smb_trans_free(&t);
+	return 0;
+}
+
+smb_dirinfo_p smb_info2(smb_connect_p c, const char *name) {
+	smb_dirinfo_p d;
+	NEW_STRUCT(d);
+	if (smb_info(c, name, d)) {
+		FREE_STRUCT(d);
+		return NULL;
+	}
+	return d;
+}

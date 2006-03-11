@@ -13,7 +13,7 @@ void usage() {
   -O dir		output directory\n\
   -s <int>[k|m|g|t]     limit download speed\n\
   -h                    show this message\n\
-  -d [0-6]              debug level\n");
+  -d [0-6]              debug level, default - 3\n");
 }
 
 smb_flow_p flow;
@@ -55,16 +55,25 @@ int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const 
 	int fd = -1;
 	static char buf[64*1024];
 	int res, len;
-	uint64_t off, rem;
+	off_t off, rem;
 	
 	fid = smb_open(c, src, OPEN_FLAGS_OPEN_READ);
-	if (fid < 0) goto err;
+	if (fid < 0) {
+		perror(src);
+		goto err;
+	}
 	
 	fd = open(dst, O_CREAT | O_WRONLY | O_LARGEFILE, 0644);
-	if (fd < 0) goto err;
+	if (fd < 0) {
+		perror(dst);
+		goto err;
+	}
 	
 	off = lseek(fd, 0, SEEK_END);
-	if (off == (off_t)-1) goto err;
+	if (off == (off_t)-1) {
+		perror(dst);
+		goto err;
+	}
 
 	rem = di->file_size - off;
 
@@ -72,13 +81,18 @@ int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const 
 	while (rem > 0) {
 		len  = (rem < sizeof(buf))?rem:sizeof(buf);
 		res = smb_read(c, fid, buf, len, off);
-		if (res < 0) goto err;
+		if (res < 0) {
+			perror(src);
+			goto err;
+		}
 		if (res > 0) {			
 			off += res;
 			rem -= res;
-			if (write(fd, buf, res) != res)	goto err;
-			
-		}		
+			if (write(fd, buf, res) != res)	{
+				perror(dst);
+				goto err;
+			}			
+		}	
 		if (smb_flow(flow, res)) {
 			ll = 0;
 			ll += printf("%6s of ", human_file_size(off));
@@ -94,22 +108,22 @@ int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const 
 	}
 	while (ll--) printf(" ");
 	printf("\r");
-	fflush(stdout);
+	fflush(stdout);	
 	
 	close(fd);
-	if (smb_close(c, fid)) goto err;
+	smb_close(c, fid);
 	return 0;
+
 err:
-	perror(dst);
-	if (fd >= 0) close(fd);
-	if (fid >= 0) smb_close(c, fid);
+	if (fid > 0) smb_close(c, fid);
+	if (fd > 0) close(fd);
 	return -1;
 }
 
 int smb_download_dir(smb_connect_p c, const char *src, const char *dst) {
 	char *mask, *sname, *dname, *lname;	
 	smb_dirinfo_t di;
-	smb_find_t f;
+	smb_find_p f;
 
 	if (mkdir(dst, 0755)) {
 		perror(dst);
@@ -117,13 +131,14 @@ int smb_download_dir(smb_connect_p c, const char *src, const char *dst) {
 	}
 	
 	asprintf(&mask, "%s\\*", src);
-	if (smb_find_first(c, &f, mask)) {
+	f = smb_find_first2(c, mask);
+	if (!f) {
 		perror(src);
 		free(mask);
 		return -1;
-	}	
+	}
 
-	while (!smb_find_next(c, &f, &di)) {
+	while (!smb_find_next(f, &di)) {
 		lname = iconv_dos_to_local(di.name);
 		
 		asprintf(&sname, "%s\\%s", src, di.name);
@@ -141,7 +156,7 @@ int smb_download_dir(smb_connect_p c, const char *src, const char *dst) {
 		free(sname);
 		free(dname);
 	}	
-	smb_find_close(c, &f);
+	smb_find_close2(f);
 	free(mask);
 	
 	return 0;
@@ -150,14 +165,15 @@ int smb_download_dir(smb_connect_p c, const char *src, const char *dst) {
 int smb_list_dir(smb_connect_p c, const char *path) {
 	char *mask, *lname;
 	smb_dirinfo_t di;
-	smb_find_t fi;
+	smb_find_p f;
 	uint64_t total = 0;
 	asprintf(&mask, "%s\\*", path);
-	if (smb_find_first(c, &fi, mask)) {
+	f = smb_find_first2(c, mask);
+	if (!f) {
 		free(mask);
 		return -1;
 	}
-	while (!smb_find_next(c, &fi, &di)) {
+	while (!smb_find_next(f, &di)) {
 		lname = iconv_dos_to_local(di.name);
 		smb_print_file(&di, lname);
 		if (!(di.attributes & FILE_ATTRIBUTE_DIRECTORY)) {
@@ -166,7 +182,7 @@ int smb_list_dir(smb_connect_p c, const char *path) {
 		free(lname);
 	}
 	printf("total: %s\n", human_file_size(total));
-	smb_find_close(c, &fi);
+	smb_find_close2(f);
 	free(mask);	
 	return 0;
 }
@@ -180,10 +196,7 @@ int smb_list_node(const char *host) {
 	char **dom;
 	c = smb_connect3(host, "IPC$");	
 	
-	if (!c) {
-		perror(host);
-		return -1;
-	}
+	if (!c) return -1;
 	
 	if (!smb_domain_enum(c, &e)) {		
 		dc = e.count;
@@ -219,7 +232,7 @@ int smb_ls(char *arg) {
 	smb_uri_t uri;
 	smb_connect_p c;
 	smb_dirinfo_t di;
-	smb_find_t f;	
+	smb_find_p f;
 
 	if (smb_uri_parse(&uri, arg)) {
 		errno = EINVAL;
@@ -228,36 +241,35 @@ int smb_ls(char *arg) {
 	
 	if (uri.share) {
 		c = smb_connect3(uri.host, uri.share);
-		if (!c) {
-			perror(uri.host);
-			return -1;
-		}
+		if (!c) return -1;
 		if (uri.file) {
-			if (!smb_find_first(c, &f, uri.path)) {
-				while (!smb_find_next(c, &f, &di)) {
-					char *name = iconv_dos_to_local(di.name);
-					if (di.attributes & FILE_ATTRIBUTE_DIRECTORY) {
-						char *dir;
-						printf("%s:\n", name);						
-						asprintf(&dir, "%s\\%s", uri.dir, di.name);
-						smb_list_dir(c, dir);
-						free(dir);
-						printf("\n");
-					} else {
-						smb_print_file(&di, name);
-					}
-					free(name);
-				}
-				smb_find_close(c, &f);
-			} else {
+			f = smb_find_first2(c, uri.path);
+			if (!f) {
 				perror(arg);
+				return -1;
 			}
+			while (!smb_find_next(f, &di)) {
+				char *name = iconv_dos_to_local(di.name);
+				if (di.attributes & FILE_ATTRIBUTE_DIRECTORY) {
+					char *dir;
+					printf("%s:\n", name);
+					asprintf(&dir, "%s\\%s", uri.dir, di.name);
+					smb_list_dir(c, dir);
+					free(dir);
+					printf("\n");
+				} else {
+					smb_print_file(&di, name);
+				}
+				free(name);
+			}
+			smb_find_close2(f);
 		} else {
 			smb_list_dir(c, "");
 		}
 	} else {
 		smb_list_node(uri.host);
-	}	
+	}
+	
 	return 0;
 }
 
@@ -268,7 +280,7 @@ int smb_get(char *arg) {
 	smb_uri_t uri;
 	smb_connect_p c;
 	smb_dirinfo_t di;
-	smb_find_t f;
+	smb_find_p f;
 	
 	if (smb_uri_parse(&uri, arg) || !uri.host) {
 		errno = EINVAL;
@@ -276,19 +288,16 @@ int smb_get(char *arg) {
 	}
 	
 	c = smb_connect3(uri.host, uri.share);
-	if (!c) {
-		perror(uri.host);
-		return -1;
-	}
+	if (!c) return -1;
 	
 	if (uri.file) {
-		if (smb_find_first(c, &f, uri.path)) {
+		f = smb_find_first2(c, uri.path);
+		if (!f) {
 			perror(arg);
 			smb_disconnect(c);
 			return -1;
 		}
-		
-		while (!smb_find_next(c, &f, &di)) {
+		while (!smb_find_next(f, &di)) {
 			char *src, *dst, *name;
 			name = iconv_dos_to_local(di.name);
 			asprintf(&src, "%s\\%s", uri.dir, di.name);
@@ -316,7 +325,7 @@ int smb_get(char *arg) {
 			free(name);
 			outfile = NULL;
 		}
-		smb_find_close(c, &f);
+		smb_find_close2(f);
 	} else {
 		if (outfile) {
 			smb_download_dir(c, "", outfile);
@@ -334,16 +343,11 @@ int main(int argc, char * const argv[]) {
 	if (argc == 1) {
 		usage();
 		return 0;
-	}	
-#ifdef WINDOWS
-	WSADATA wsaData;
-	if (WSAStartup(MAKEWORD(2, 0), &wsaData )) {
-		exit(2);
 	}
-#endif
+	
 	iconv_init();
 	
-	flow = smb_flow_new();	
+	flow = smb_flow_new();
 	
 	while (1) {
 		int o = getopt(argc, argv, "-l:s:o:O:d:h");
@@ -371,11 +375,7 @@ int main(int argc, char * const argv[]) {
 				usage();
 				break;
 		}
-	}
-	
-#ifdef WINDOWS
-	WSACleanup();
-#endif
+	}	
 	return 0;
 }
 

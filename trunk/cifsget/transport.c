@@ -53,7 +53,10 @@ int smb_nbt_session(int sock, const char *name) {
 	if (GET_NBTHEADER_LENGTH(h)) {
 		smb_recv_skip_sock(sock, GET_NBTHEADER_LENGTH(h));
 	}
-	if (GET_NBTHEADER_TYPE(h) != 0x82) return -1;
+	if (GET_NBTHEADER_TYPE(h) != 0x82) {
+		errno = ECONNABORTED;
+		return -1;
+	}
 	return 0;
 }
 
@@ -61,17 +64,20 @@ smb_connect_p smb_connect(const char *server) {
 	struct sockaddr_in addr;
 	struct hostent *hp;
 	int sock;
-	smb_connect_p c;
+	smb_connect_p c;	
 
 	ZERO_STRUCT(addr);
 	if ((addr.sin_addr.s_addr = inet_addr(server)) == INADDR_NONE) {
 		hp = gethostbyname(server);
 		if (!hp) {
 			errno = ENOENT;
+			smb_log_error("connection to %s failed: %s\n", server, strerror(errno));
 			return NULL;
 		}
 		memcpy(&addr.sin_addr, hp->h_addr, sizeof(struct in_addr));
 	}
+
+	smb_log_verbose("connecting to %s (%s:445)\n", server, inet_ntoa(addr.sin_addr));
 
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(445);
@@ -81,10 +87,11 @@ smb_connect_p smb_connect(const char *server) {
 	
 	if (connect(sock, (struct sockaddr*)&addr, sizeof(addr))) {
 		addr.sin_port = htons(139);
+		smb_log_verbose("connecting to %s (%s:139)\n", server, inet_ntoa(addr.sin_addr));
 		if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) 
 				|| smb_nbt_session(sock, server)) {
+			smb_log_error("connection to %s (%s) failed: %s\n", server, inet_ntoa(addr.sin_addr), strerror(errno));
 			close(sock);
-			errno = ECONNREFUSED;
 			return NULL;
 		}
 	}
@@ -167,7 +174,6 @@ int smb_send(smb_connect_p c) {
 int smb_recv_skip_sock(int sock, int size) {
 	unsigned char buf;
 	int res;	
-
 	smb_log_debug("skip %d bytes\n", size);
 	while (size > 0) {
 		res = recv(sock, &buf, 1, MSG_WAITALL);
@@ -267,8 +273,8 @@ int smb_recv(smb_connect_p c) {
 	if (!c->connected) {
 		errno = ENOTCONN;
 		return -1;
-	}	
-
+	}
+	
 	c->i_len = 4;
 	c->i_done = 0;
 	
@@ -379,9 +385,7 @@ int smb_recv_async(smb_connect_p c) {
 			}
 		}
 	}
-
-	if (c->i_done == c->i_len) return 0;
-	
+	if (c->i_done == c->i_len) return 0;	
 	errno = EAGAIN;
 	return -1;
 }
