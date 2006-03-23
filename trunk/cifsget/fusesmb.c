@@ -34,7 +34,7 @@ typedef struct fusesmb_path_s {
 } fusesmb_path_t;
 typedef fusesmb_path_t *fusesmb_path_p;
 
-typedef struct fusesmb_file_s {
+/*typedef struct fusesmb_file_s {
 	smb_connect_p conn;
 	int tid;
 	int fid;
@@ -42,9 +42,9 @@ typedef struct fusesmb_file_s {
 	off_t buf_off;
 	int buf_len;
 } fusesmb_file_t;
-typedef fusesmb_file_t *fusesmb_file_p;
+typedef fusesmb_file_t *fusesmb_file_p;*/
 
-int fusesmb_parse_path(const char *path, fusesmb_path_p res) {
+static int fusesmb_parse_path(const char *path, fusesmb_path_p res) {
 	char *p, *o;
 	p = iconv_local_to_dos_buf(path, res->path, sizeof(res->path));
 	if (!p) return -1;
@@ -67,40 +67,37 @@ int fusesmb_parse_path(const char *path, fusesmb_path_p res) {
 	return 0;
 }
 
-void strtolower(char *s) {
+static void strtolower(char *s) {
 	while (*s) {
 		*s = tolower(*s);
 		s++;
 	}
 }
 
-fusesmb_host_p fusesmb_host_list = NULL;
+static fusesmb_host_p fusesmb_host_list = NULL;
 
-fusesmb_host_p fusesmb_host_find(const char *host_name) {
+static fusesmb_host_p fusesmb_host_find(const char *host_name) {
 	fusesmb_host_p host;
 	for (host = fusesmb_host_list ; host && strcmp(host_name, host->name) ; host = host->next);
 	return host;
 }
 
-fusesmb_share_p fusesmb_share_find(fusesmb_host_p host, const char *share_name) {
+static fusesmb_share_p fusesmb_share_find(fusesmb_host_p host, const char *share_name) {
 	fusesmb_share_p share;
 	for ( share = host->share_list ; share && strcmp(share->name, share_name) ; share = share->next);
 	return share;
 }
 
 
-fusesmb_host_p fusesmb_connect_host(const char *host_name) {
+static fusesmb_host_p fusesmb_connect_host(const char *host_name) {
 	fusesmb_host_p host;
 	smb_connect_p conn;
 	
 	host = fusesmb_host_find(host_name);
 	
 	if (!host || !host->conn) {
-		NEW_STRUCT(conn);
-		if (smb_connect2(conn, host_name)) {
-			FREE_STRUCT(conn);
-			return NULL;
-		}
+		conn = smb_connect2(host_name);
+		if (!conn) return NULL;
 		if (!host) {
 			NEW_STRUCT(host);
 			host->name = strdup(host_name);
@@ -112,7 +109,7 @@ fusesmb_host_p fusesmb_connect_host(const char *host_name) {
 	return host;
 }
 
-fusesmb_share_p fusesmb_connect_share(fusesmb_host_p host, const char *share_name) {
+static fusesmb_share_p fusesmb_connect_share(fusesmb_host_p host, const char *share_name) {
 	fusesmb_share_p share;
 	smb_connect_p conn;
 	int tid;
@@ -123,12 +120,12 @@ fusesmb_share_p fusesmb_connect_share(fusesmb_host_p host, const char *share_nam
 	share = fusesmb_share_find(host, share_name);
 	
 	if (share && share->tid >= 0) {
-		smb_treeswitch(conn, share->tid);
+		smb_tree_switch(conn, share->tid);
 		return share;
 	}
 
 	dos_share_name = iconv_local_to_dos(share_name);
-	tid = smb_treeconnect(conn, host->name, dos_share_name);
+	tid = smb_tree_connect(conn, host->name, dos_share_name);
 	free(dos_share_name);
 	if (tid < 0) return NULL;
 	
@@ -143,7 +140,7 @@ fusesmb_share_p fusesmb_connect_share(fusesmb_host_p host, const char *share_nam
 	return share;
 }
 
-smb_connect_p fusesmb_connect(const char *host_name, const char *share_name) {
+static smb_connect_p fusesmb_connect(const char *host_name, const char *share_name) {
 	fusesmb_host_p host;
 	fusesmb_share_p share;	
 	
@@ -155,7 +152,7 @@ smb_connect_p fusesmb_connect(const char *host_name, const char *share_name) {
 	return host->conn;
 }
 
-int fusesmb_list_share(const char *host_name) {
+static int fusesmb_list_share(const char *host_name) {
 	smb_node_enum_t e;
 	fusesmb_host_p host;
 	fusesmb_share_p share;
@@ -191,7 +188,7 @@ int fusesmb_list_share(const char *host_name) {
 	return 0;
 }
 
-int fusesmb_list_host(const char *server, const char *workgroup) {
+static int fusesmb_list_host(const char *server, const char *workgroup) {
 	smb_connect_p conn;
 	smb_node_enum_t e;
 	smb_node_t n;
@@ -214,7 +211,7 @@ int fusesmb_list_host(const char *server, const char *workgroup) {
 	return 0;
 }
 
-int fusesmb_make_stat (struct stat *st, smb_dirinfo_p di) {
+static int fusesmb_make_stat (struct stat *st, smb_dirinfo_p di) {
 	st->st_dev = 0;
 	st->st_ino = 0;
 	
@@ -236,7 +233,7 @@ int fusesmb_make_stat (struct stat *st, smb_dirinfo_p di) {
 	return 0;
 }
 
-int fusesmb_getattr (const char *path, struct stat *st) {
+static int fusesmb_getattr (const char *path, struct stat *st) {
 	smb_connect_p conn;
 	fusesmb_path_t p;
 	smb_dirinfo_t di;
@@ -288,19 +285,19 @@ static int fusesmb_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	conn = fusesmb_connect(p.host, p.share);
 	if (!conn) return -ENOENT;
 	strcat(p.path, "\\*");
-	if (smb_find_first(conn, &fr, p.path)) return -ENOENT;
-	while (!smb_find_next(conn, &fr, &di)) {
+	if (smb_find_first(conn, p.path, &fr)) return -ENOENT;
+	while (!smb_find_next(&fr, &di)) {
 		fusesmb_make_stat(&st, &di);		
 		if (!iconv_dos_to_local_buf(di.name, name, sizeof(name))) continue;
 		if (filler(buf, name, &st, 0)) return -EIO;
 	}
-	if (smb_find_close(conn, &fr)) return -EIO;
+	if (smb_find_close(&fr)) return -EIO;
 	return 0;
 }
 
 static int fusesmb_open(const char *path, struct fuse_file_info *fi) {
 	int fid;
-	fusesmb_file_p file;
+	//fusesmb_file_p file;
 	fusesmb_host_p host;
 	fusesmb_share_p share;
 	smb_connect_p conn;
@@ -315,26 +312,27 @@ static int fusesmb_open(const char *path, struct fuse_file_info *fi) {
 	fid = smb_open(conn, p.path, OPEN_FLAGS_OPEN_READ);
 	if (fid < 0 ) return -EIO;
 	
-	NEW_STRUCT(file);
+	/*NEW_STRUCT(file);
 	file->conn = conn;
 	file->tid = share->tid;	
-	file->fid = fid;
+	file->fid = fid;	
+	fi->fh = (uint64_t)file;*/
 	
-	fi->fh = (unsigned long int)file;
+	fi->fh = fid;
 	
 	return 0;
 }
 
 static int fusesmb_read(const char *path, char *buf, size_t size, off_t offset,
                     struct fuse_file_info *fi) {
-	off_t res, off;
+	/*off_t res, off;
 	fusesmb_file_p file = (fusesmb_file_p)fi->fh;
 
 	res = file->buf_off + file->buf_len - offset;
 	off = offset - file->buf_off;
 	
 	if (off < 0 || res <= 0) {
-		smb_treeswitch(file->conn, file->tid);
+		smb_tree_switch(file->conn, file->tid);
 		res = smb_read(file->conn, file->fid, file->buf, sizeof(file->buf), offset);
 		if (res < 0) return -EIO;
 		
@@ -345,13 +343,17 @@ static int fusesmb_read(const char *path, char *buf, size_t size, off_t offset,
 	
 	if (res > size) res = size;
 	memcpy(buf, file->buf + off, res);
-	
-	return res;
+		
+	return res; */	
+
+	int res;
+
+	res = 
 }
 
 static int fusesmb_release(const char *path, struct fuse_file_info *fi) {
 	fusesmb_file_p file = (fusesmb_file_p)fi->fh;
-	smb_treeswitch(file->conn, file->tid);
+	smb_tree_switch(file->conn, file->tid);
 	smb_close(file->conn, file->fid);
 	FREE_STRUCT(file);
 	fi->fh = 0;
@@ -372,3 +374,4 @@ int main(int argc, char *argv[]) {
 	fusesmb_list_host("server", "HACKERS");
     	return fuse_main(argc, argv, &fusesmb_oper);
 }
+

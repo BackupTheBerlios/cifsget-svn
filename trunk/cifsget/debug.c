@@ -2,15 +2,17 @@
 
 int smb_log_level = SMB_LOG_NORMAL;
 
-void smb_log_msg(const char *fmt, ...) {
+int smb_log_msg(const char *fmt, ...) {
+	int res;
 	va_list ap;
 	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
+	res = vfprintf(stderr, fmt, ap);
 	va_end(ap);
+	return res;
 }
 
-void smb_log_hex(void *buf, int len) {
-	int i;
+int smb_log_hex(void *buf, int len) {
+	int i, res = 0;
 	char line[16*4+3], *p;
 	while (len > 0) {
 		p = line;
@@ -36,12 +38,13 @@ void smb_log_hex(void *buf, int len) {
 			i++;
 		}
 		*p++ = '\n';
+		res += p - line;
 		*p++ = '\0';
 		fputs(line, stderr);
-		
 		buf += 16;
 		len -= 16;
 	}
+	return res;
 }
 
 void smb_log_trans(const char *name, smb_trans_p t) {

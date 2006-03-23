@@ -1,7 +1,8 @@
 #include "includes.h"
 
 void usage() {
-	printf("usage: cifsget [OPTION]... (URI|UNC|SHORT)...\n\
+	smb_log_normal("\
+usage: cifsget [OPTION]... (URI|UNC|SHORT)...\n\
   \n\
   URI:    (smb|file|cifs)://host/share/path/NAME\n\
   UNC:    \\\\host\\share\\path\\NAME\n\
@@ -13,16 +14,17 @@ void usage() {
   -O dir		output directory\n\
   -s <int>[k|m|g|t]     limit download speed\n\
   -h                    show this message\n\
-  -d [0-6]              debug level, default - 3\n");
+  -d [0-6]              debug level, default - 3\n\
+");
 }
 
 smb_flow_p flow;
 
 void smb_print_file(smb_dirinfo_p di, const char *name) {
 	if (di->attributes & FILE_ATTRIBUTE_DIRECTORY) {
-		printf(" <dir> %s/\n", name);
+		smb_log_normal(" <dir> %s/\n", name);
 	} else {
-		printf("%6s %s\n", human_file_size(di->file_size), name);
+		smb_log_normal("%6s %s\n", human_file_size(di->file_size), name);
 	}
 }
 
@@ -44,7 +46,7 @@ int smb_print_node(smb_node_p n) {
 			type = "<unk>";
 			break;		
 	}
-	printf(" %s %s\t%s\n", type, lname, lcomm);
+	smb_log_normal(" %s %s\t%s\n", type, lname, lcomm);
 	free(lname);
 	free(lcomm);
 	return 0;
@@ -91,25 +93,26 @@ int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const 
 			if (write(fd, buf, res) != res)	{
 				perror(dst);
 				goto err;
-			}			
-		}	
-		if (smb_flow(flow, res)) {
-			ll = 0;
-			ll += printf("%6s of ", human_file_size(off));
-			ll += printf("%6s ", human_file_size(di->file_size));
-			ll += printf("(%.1f%%) ", (double)off * 100.0 / di->file_size);
-			ll += printf("%6s/s ", human_file_size(flow->speed));
-			if (flow->speed > 0) {
-				ll += printf("ETA: %s ", human_time((di->file_size - off) / flow->speed));
 			}
-			printf("\r");
-			fflush(stdout);
+		}
+		if (smb_log_level >= SMB_LOG_NORMAL && smb_flow(flow, res)) {
+			ll = 0;
+			ll += smb_log_msg("%6s of ", human_file_size(off));
+			ll += smb_log_msg("%6s ", human_file_size(di->file_size));
+			ll += smb_log_msg("(%.1f%%) ", (double)off * 100.0 / di->file_size);
+			ll += smb_log_msg("%6s/s ", human_file_size(flow->speed));
+			if (flow->speed > 0) {
+				ll += smb_log_msg("ETA: %s ", human_time((di->file_size - off) / flow->speed));
+			}
+			smb_log_msg("\r");
+			smb_log_flush();
 		}
 	}
-	while (ll--) printf(" ");
-	printf("\r");
-	fflush(stdout);	
-	
+	if (smb_log_level >= SMB_LOG_NORMAL) {
+		while (ll--) smb_log_msg(" ");
+		smb_log_msg("\r");
+		smb_log_flush();
+	}	
 	close(fd);
 	smb_close(c, fid);
 	return 0;
@@ -181,7 +184,7 @@ int smb_list_dir(smb_connect_p c, const char *path) {
 		}
 		free(lname);
 	}
-	printf("total: %s\n", human_file_size(total));
+	smb_log_normal("total: %s\n", human_file_size(total));
 	smb_find_close2(f);
 	free(mask);	
 	return 0;
@@ -207,15 +210,15 @@ int smb_list_node(const char *host) {
 			dom[i++] = strdup(n.name);
 		}
 		
-		printf("\n");
+		smb_log_normal("\n");
 		
 		for (i = 0 ; i < dc ; i++) {			
 			if (!smb_server_enum(c, &e, dom[i])) {
-				printf("%s:\n", dom[i]);
+				smb_log_normal("%s:\n", dom[i]);
 				while (!smb_node_next(c, &e, &n)) {
 					smb_print_node(&n);
 				}
-				printf("\n");
+				smb_log_normal("\n");
 			}			
 		}		
 	}
@@ -252,11 +255,11 @@ int smb_ls(char *arg) {
 				char *name = iconv_dos_to_local(di.name);
 				if (di.attributes & FILE_ATTRIBUTE_DIRECTORY) {
 					char *dir;
-					printf("%s:\n", name);
+					smb_log_normal("%s:\n", name);
 					asprintf(&dir, "%s\\%s", uri.dir, di.name);
 					smb_list_dir(c, dir);
 					free(dir);
-					printf("\n");
+					smb_log_normal("\n");
 				} else {
 					smb_print_file(&di, name);
 				}
