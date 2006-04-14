@@ -304,27 +304,43 @@ size_t smb_read(smb_connect_p c, int fid, void *buf, size_t count, uint64_t offs
 	return smb_read_andx_recv(c, buf, count);
 }
 
-smb_connect_p smb_connect2(const char *server) {
+smb_connect_p smb_connect(const char *addr, const char *name) {
 	smb_connect_p c;
-	c = smb_connect(server);
-	if (!c) return NULL;
+	NEW_STRUCT(c);
+	if (smb_connect_raw(c, addr, 445, name) && smb_connect_raw(c, addr, 139, name)) {
+		smb_disconnect_raw(c);
+		FREE_STRUCT(c);
+		return NULL;
+	}
 	if (smb_negotiate(c) || smb_sessionsetup(c)) {
-		smb_log_error("connection to %s failed: %s\n", server, strerror(errno));
+		smb_log_error("connection to %s failed: %s\n", name, strerror(errno));
+		smb_disconnect_raw(c);
+		FREE_STRUCT(c);
+		return NULL;
+	}
+	return c;
+}
+
+int smb_disconnect(smb_connect_p c) {
+	smb_disconnect_raw(c);
+	FREE_STRUCT(c);
+	return 0;
+}
+
+
+smb_connect_p smb_connect_tree(const char *addr, const char *name, const char *tree) {
+	smb_connect_p c;
+	c = smb_connect(addr, name);
+	if (!c) return NULL;
+	if (smb_tree_connect(c, name, tree) < 0) {
+		smb_log_error("connection to \\\\%s\\%s failed: %s\n", name, tree, strerror(errno));
 		smb_disconnect(c);
 		return NULL;
 	}
 	return c;
 }
 
-smb_connect_p smb_connect3(const char *server, const char *share) {
-	smb_connect_p c;
-	c = smb_connect2(server);
-	if (!c) return NULL;
-	if ( smb_tree_connect(c, server, share) < 0) {
-		smb_log_error("connection to \\\\%s\\%s failed: %s\n", server, share, strerror(errno));
-		smb_disconnect(c);
-		return NULL;
-	}
-	return c;
+smb_connect_p smb_connect_uri(smb_uri_p uri) {
+	return smb_connect_tree(uri->addr, uri->name, uri->tree);
 }
 

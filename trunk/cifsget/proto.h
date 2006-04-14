@@ -11,8 +11,10 @@ int smb_tree_connect(smb_connect_p c, const char *server, const char *share);
 int smb_tree_switch(smb_connect_p c, int tid);
 int smb_tree_disconnect(smb_connect_p c, int tid);
 
-smb_connect_p smb_connect2(const char *server);
-smb_connect_p smb_connect3(const char *server, const char *share);
+smb_connect_p smb_connect(const char *addr, const char *name);
+smb_connect_p smb_connect_tree(const char *addr, const char *name, const char *tree);
+smb_connect_p smb_connect_uri(smb_uri_p uri);
+int smb_disconnect(smb_connect_p c);
 
 int smb_open(smb_connect_p c, const char *name, int mode);
 int smb_close(smb_connect_p c, int fid);

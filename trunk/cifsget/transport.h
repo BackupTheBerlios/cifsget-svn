@@ -22,8 +22,9 @@ typedef struct smb_connect_s {
 } smb_connect_t;
 typedef smb_connect_t *smb_connect_p;
 
-smb_connect_p smb_connect(const char *server);
-int smb_disconnect(smb_connect_p c);
+int smb_connect_raw(smb_connect_p conn, const char *address, int port, const char *name);
+int smb_disconnect_raw(smb_connect_p conn);
+
 int smb_connected(smb_connect_p c);
 
 int smb_send(smb_connect_p c);

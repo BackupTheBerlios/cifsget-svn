@@ -3,13 +3,14 @@
 
 typedef struct smb_uri_s {
 	char *scheme;
-	char *host;
-	char *share;
+	char *name;
+	char *tree;
 	char *path;
 	char *file; /* last name in path */
 	char *dir;  /* all except file */
 	char *login;
 	char *password;
+	char *addr; /*ip*/
 	int port;
 } smb_uri_t;
 typedef smb_uri_t *smb_uri_p;

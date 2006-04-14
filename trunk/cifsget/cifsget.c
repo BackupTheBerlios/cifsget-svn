@@ -1,20 +1,22 @@
 #include "includes.h"
 
 void usage() {
-	smb_log_normal("\
-usage: cifsget [OPTION]... (URI|UNC|SHORT)...\n\
+	smb_log_msg("\
+usage: cifsget OPTION | URI | UNC | SHORT ...\n\
   \n\
   URI:    (smb|file|cifs)://host/share/path/NAME\n\
   UNC:    \\\\host\\share\\path\\NAME\n\
   SHORT:  host/share/path/NAME\n\
   NAME:   (file|dir|mask)\n\
   \n\
+  OPTION:\n\
   -l                    list directory contents\n\
   -o file		output file\n\
   -O dir		output directory\n\
   -s <int>[k|m|g|t]     limit download speed\n\
-  -h                    show this message\n\
+  -h                    show this message and exit\n\
   -d [0-6]              debug level, default - 3\n\
+  -i ip			destination ip\n\
 ");
 }
 
@@ -128,7 +130,7 @@ int smb_download_dir(smb_connect_p c, const char *src, const char *dst) {
 	smb_dirinfo_t di;
 	smb_find_p f;
 
-	if (mkdir(dst, 0755)) {
+	if (mkdir(dst, 0755) && errno != EEXIST) {
 		perror(dst);
 		return -1;
 	}
@@ -190,14 +192,14 @@ int smb_list_dir(smb_connect_p c, const char *path) {
 	return 0;
 }
 
-int smb_list_node(const char *host) {
+int smb_list_node(const char *addr, const char *name) {
 	smb_connect_p c;
 	smb_node_enum_t e;
 	smb_node_t n;
 	
 	int dc, i;
 	char **dom;
-	c = smb_connect3(host, "IPC$");	
+	c = smb_connect_tree(addr, name, "IPC$");
 	
 	if (!c) return -1;
 	
@@ -231,24 +233,18 @@ int smb_list_node(const char *host) {
 	return 0;
 }
 
-int smb_ls(char *arg) {
-	smb_uri_t uri;
+int smb_ls(smb_uri_p uri) {
 	smb_connect_p c;
 	smb_dirinfo_t di;
 	smb_find_p f;
-
-	if (smb_uri_parse(&uri, arg)) {
-		errno = EINVAL;
-		return -1;
-	}
 	
-	if (uri.share) {
-		c = smb_connect3(uri.host, uri.share);
+	if (uri->tree) {
+		c = smb_connect_uri(uri);
 		if (!c) return -1;
-		if (uri.file) {
-			f = smb_find_first2(c, uri.path);
+		if (uri->file) {
+			f = smb_find_first2(c, uri->path);
 			if (!f) {
-				perror(arg);
+				perror(uri->path);
 				return -1;
 			}
 			while (!smb_find_next(f, &di)) {
@@ -256,7 +252,7 @@ int smb_ls(char *arg) {
 				if (di.attributes & FILE_ATTRIBUTE_DIRECTORY) {
 					char *dir;
 					smb_log_normal("%s:\n", name);
-					asprintf(&dir, "%s\\%s", uri.dir, di.name);
+					asprintf(&dir, "%s\\%s", uri->dir, di.name);
 					smb_list_dir(c, dir);
 					free(dir);
 					smb_log_normal("\n");
@@ -270,7 +266,7 @@ int smb_ls(char *arg) {
 			smb_list_dir(c, "");
 		}
 	} else {
-		smb_list_node(uri.host);
+		smb_list_node(uri->addr, uri->name);
 	}
 	
 	return 0;
@@ -279,31 +275,25 @@ int smb_ls(char *arg) {
 
 char *outfile = NULL, *outdir = ".";
 
-int smb_get(char *arg) {
-	smb_uri_t uri;
+int smb_get(smb_uri_p uri) {
 	smb_connect_p c;
 	smb_dirinfo_t di;
 	smb_find_p f;
 	
-	if (smb_uri_parse(&uri, arg) || !uri.host) {
-		errno = EINVAL;
-		return -1;
-	}
-	
-	c = smb_connect3(uri.host, uri.share);
+	c = smb_connect_uri(uri);
 	if (!c) return -1;
 	
-	if (uri.file) {
-		f = smb_find_first2(c, uri.path);
+	if (uri->file) {
+		f = smb_find_first2(c, uri->path);
 		if (!f) {
-			perror(arg);
+			perror(uri->path);
 			smb_disconnect(c);
 			return -1;
 		}
 		while (!smb_find_next(f, &di)) {
 			char *src, *dst, *name;
 			name = iconv_dos_to_local(di.name);
-			asprintf(&src, "%s\\%s", uri.dir, di.name);
+			asprintf(&src, "%s\\%s", uri->dir, di.name);
 			
 			if (!outfile) {
 				asprintf(&dst, "%s/%s", outdir, name);
@@ -333,7 +323,7 @@ int smb_get(char *arg) {
 		if (outfile) {
 			smb_download_dir(c, "", outfile);
 		} else {
-			char *name = iconv_dos_to_local(uri.share);
+			char *name = iconv_dos_to_local(uri->tree);
 			smb_download_dir(c, "", name);
 			free(name);
 		}
@@ -351,15 +341,21 @@ int main(int argc, char * const argv[]) {
 	iconv_init();
 	
 	flow = smb_flow_new();
+
+	smb_uri_p uri;
+	char *addr = NULL;
+	int list = 0;
+	int opt;
+
+	NEW_STRUCT(uri);	
 	
-	while (1) {
-		int o = getopt(argc, argv, "-l:s:o:O:d:h");
-		if (o == -1) break;
-		switch (o) {
+	do {
+		opt = getopt(argc, argv, "-ls:o:O:d:i:h");
+		switch (opt) {
 			case 'd':
 				smb_log_level = atoi(optarg);
 				break;
-			case 's':
+			case 's':			
 				flow->limit = from_human_file_size(optarg);
 				break;
 			case 'O':
@@ -369,16 +365,33 @@ int main(int argc, char * const argv[]) {
 				outfile = strdup(optarg);
 				break;
 			case 'l':
-				smb_ls(optarg);
+				list = 1;
 				break;
+			case 'i':
+				addr = strdup(optarg);
+				break;
+			case -1:
 			case 1:
-				smb_get(optarg);
+				if (uri->name) {
+					if (list) {
+						smb_ls(uri);
+						list = 0;
+					} else
+						smb_get(uri);
+				}
+				smb_uri_free(uri);
+				if (optarg) smb_uri_parse(uri, optarg);
+				if (addr) {
+					uri->addr = addr;
+					addr = NULL;
+				}
 				break;
+			case '?':
 			case 'h':
 				usage();
-				break;
+				return 2;
 		}
-	}	
+	} while (opt != -1);
 	return 0;
 }
 

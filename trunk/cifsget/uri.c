@@ -98,10 +98,10 @@ int smb_uri_parse(smb_uri_p uri, const char *str) {
 		switch (i) {
 			case 0:
 				//if (smb_parse_dest(p, uri)) return -1;
-				uri->host = stredup(p, n);
+				uri->name = stredup(p, n);
 				break;
 			case 1:
-				uri->share = stredup(p, n);
+				uri->tree = stredup(p, n);
 				break;
 			default:
 				*d++ = '\\';
@@ -124,11 +124,12 @@ int smb_uri_parse(smb_uri_p uri, const char *str) {
 
 void smb_uri_free(smb_uri_p uri) {
 	free(uri->scheme);
-	free(uri->host);
-	free(uri->share);
+	free(uri->name);
+	free(uri->tree);
 	free(uri->path);
 	free(uri->file);
 	free(uri->dir);
 	free(uri->login);
 	free(uri->password);
+	free(uri->addr);
 }

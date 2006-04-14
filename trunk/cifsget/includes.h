@@ -47,6 +47,8 @@
 #include "atom.h"
 #include "struct.h"
 
+#include "uri.h"
+
 #include "transport.h"
 #include "proto.h"
 #include "transact.h"
@@ -54,7 +56,6 @@
 #include "rap.h"
 
 #include "debug.h"
-#include "uri.h"
 #include "codepage.h"
 #include "flow.h"
 #include "mirror.h"

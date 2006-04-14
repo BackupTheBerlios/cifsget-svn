@@ -60,59 +60,59 @@ int smb_nbt_session(int sock, const char *name) {
 	return 0;
 }
 
-smb_connect_p smb_connect(const char *server) {
+int smb_connect_raw(smb_connect_p conn, const char *address, int port, const char *name) {
 	struct sockaddr_in addr;
 	struct hostent *hp;
-	int sock;
-	smb_connect_p c;	
+
+	if (conn->connected) {
+		errno = EALREADY;
+		return -1;
+	}
+
+	if (!address) address = name;
+	if (!name) name = address;
 
 	ZERO_STRUCT(addr);
-	if ((addr.sin_addr.s_addr = inet_addr(server)) == INADDR_NONE) {
-		hp = gethostbyname(server);
+	if ((addr.sin_addr.s_addr = inet_addr(address)) == INADDR_NONE) {
+		hp = gethostbyname(address);
 		if (!hp) {
 			errno = ENOENT;
-			smb_log_error("connection to %s failed: %s\n", server, strerror(errno));
-			return NULL;
+			smb_log_error("connection to %s failed: %s\n", address, strerror(errno));
+			return -1;
 		}
 		memcpy(&addr.sin_addr, hp->h_addr, sizeof(struct in_addr));
 	}
 
-	smb_log_verbose("connecting to %s (%s:445)\n", server, inet_ntoa(addr.sin_addr));
+	smb_log_verbose("connecting to %s (%s:%d) %s\n", address, inet_ntoa(addr.sin_addr), port, name);
 
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(445);
+	addr.sin_port = htons(port);
 
-	sock = socket(PF_INET, SOCK_STREAM, 0);
-	if (sock < 0) return NULL;
+	if (conn->sock <= 0) {
+		conn->sock = socket(PF_INET, SOCK_STREAM, 0);
+		if (conn->sock < 0) return -1;
+	}	
 	
-	if (connect(sock, (struct sockaddr*)&addr, sizeof(addr))) {
-		addr.sin_port = htons(139);
-		smb_log_verbose("connecting to %s (%s:139)\n", server, inet_ntoa(addr.sin_addr));
-		if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) 
-				|| smb_nbt_session(sock, server)) {
-			smb_log_error("connection to %s (%s) failed: %s\n", server, inet_ntoa(addr.sin_addr), strerror(errno));
-			close(sock);
-			return NULL;
-		}
+	if (connect(conn->sock, (struct sockaddr*)&addr, sizeof(addr)) ||			
+			(port == 139 && smb_nbt_session(conn->sock, name))) {
+		smb_log_error("connection to %s (%s:%d) failed: %s\n", name, inet_ntoa(addr.sin_addr), port, strerror(errno));
+		return -1;
 	}
-
-	NEW_STRUCT(c);
 	
-	c->connected = 1;
-	c->sock = sock;
-	c->i_size = SMB_MAX_BUFFER + 4;
-	c->i = malloc(c->i_size);
-	c->o = malloc(SMB_MAX_BUFFER + 4);
-
-	return c;
+	conn->connected = 1;
+	conn->i_size = SMB_MAX_BUFFER + 4;
+	if (!conn->i) conn->i = malloc(conn->i_size);
+	conn->o_size = SMB_MAX_BUFFER + 4;
+	if (!conn->o) conn->o = malloc(conn->o_size);
+	return 0;
 }
 
-int smb_disconnect(smb_connect_p c) {
+int smb_disconnect_raw(smb_connect_p c) {
 	assert(c);
 	free(c->i);
 	free(c->o);
 	close(c->sock);
-	free(c);
+	ZERO_STRUCT(c);
 	return 0;
 }
 

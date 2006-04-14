@@ -9,9 +9,9 @@ int smb_download_mirror(smb_mirror_p src, const char *dst) {
 
 	work = 0;
 	for (m = src ; m ; m = m->next) {
-		m->conn = smb_connect3(m->uri.host, m->uri.share);
+		m->conn = smb_connect_tree(m->uri.addr, m->uri.name, m->uri.tree);
 		if (!m->conn) {
-			perror(m->uri.host);
+			perror(m->uri.name);
 			continue;
 		}	
 		
@@ -26,7 +26,7 @@ int smb_download_mirror(smb_mirror_p src, const char *dst) {
 err:		
 		smb_disconnect(m->conn);
 		m->conn = NULL;
-		perror(m->uri.host);
+		perror(m->uri.name);
 	}
 	
 	flow = smb_flow_new();
