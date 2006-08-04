@@ -9,7 +9,7 @@ int smb_download_mirror(smb_mirror_p src, const char *dst) {
 
 	work = 0;
 	for (m = src ; m ; m = m->next) {
-		m->conn = smb_connect_tree(m->uri.addr, m->uri.name, m->uri.tree);
+		m->conn = smb_connect_uri(&m->uri);
 		if (!m->conn) {
 			perror(m->uri.name);
 			continue;

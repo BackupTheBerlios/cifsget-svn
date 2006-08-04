@@ -32,73 +32,87 @@ char *smb_nbt_name(char *buf, const char *name) {
 	return buf;
 }
 
-int smb_nbt_session(int sock, const char *name) {
+int smb_nbt_session(int sock, const char *local, const char *remote) {
 	char b[LEN_NBTSESSION(NULL)];
 	char h[LEN_NBTHEADER(NULL)];
+	unsigned char code;
+	int len, type;
 	SET_NBTSESSION_TYPE(b, 0x81);
 	SET_NBTSESSION_FLAGS(b, 0);
 	SET_NBTSESSION_LENGTH(b, 68);
 	SET_NBTSESSION_SRC_TYPE(b, 0x20);
 	SET_NBTSESSION_DST_TYPE(b, 0x20);
-	smb_nbt_name(PTR_NBTSESSION_SRC(b), "LOCALHOST"); // $)
-	smb_nbt_name(PTR_NBTSESSION_DST(b), name);
+	smb_nbt_name(PTR_NBTSESSION_SRC(b), local);
+	smb_nbt_name(PTR_NBTSESSION_DST(b), remote);
 	
 	smb_log_struct(b, NBTSESSION);
+
+	
 	
 	if (send(sock, b, sizeof(b), 0) != sizeof(b)) return -1;
 	if (recv(sock, h, sizeof(h), 0) != sizeof(h)) return -1;
 	
 	smb_log_struct(h, NBTHEADER);
-	
-	if (GET_NBTHEADER_LENGTH(h)) {
-		smb_recv_skip_sock(sock, GET_NBTHEADER_LENGTH(h));
-	}
-	if (GET_NBTHEADER_TYPE(h) != 0x82) {
-		errno = ECONNABORTED;
+
+	type = GET_NBTHEADER_TYPE(h);
+
+	len = GET_NBTHEADER_LENGTH(h);
+
+	if (type == 0x82) return 0;
+
+	if (type == 0x83 && len == 1 && recv(sock, &code, 1, 0) == 1) {
+		smb_log_error("netbios negative session response 0x%0X code 0x%0X for \"%s\"\n", type, code, remote);
+		errno = ENOENT;
 		return -1;
 	}
-	return 0;
+	smb_log_error("netbios negative session response 0x%0X for \"%s\"\n", type, remote);
+	if (len) smb_recv_skip_sock(sock, len);
+	errno = ECONNABORTED;
+	return -1;
 }
 
-int smb_connect_raw(smb_connect_p conn, const char *address, int port, const char *name) {
-	struct sockaddr_in addr;
-	struct hostent *hp;
 
+int smb_resolve(const char *host, struct in_addr *addr) {
+	struct hostent *hp;
+	/* IP */
+	if (inet_aton(host, addr)) return 0;
+	/* DNS */
+	if ((hp = gethostbyname(host))) {
+		memcpy(hp->h_addr, addr, sizeof(struct in_addr));
+		return 0;
+	}
+	/* FAILURE */
+	errno = ENONET;
+	return -1;
+}
+
+int smb_connect_raw(smb_connect_p conn, const struct in_addr *address, int port , const char *name) {
+	struct sockaddr_in addr;
 	if (conn->connected) {
 		errno = EALREADY;
 		return -1;
 	}
-
-	if (!address) address = name;
-	if (!name) name = address;
-
-	ZERO_STRUCT(addr);
-	if ((addr.sin_addr.s_addr = inet_addr(address)) == INADDR_NONE) {
-		hp = gethostbyname(address);
-		if (!hp) {
-			errno = ENOENT;
-			smb_log_error("connection to %s failed: %s\n", address, strerror(errno));
-			return -1;
-		}
-		memcpy(&addr.sin_addr, hp->h_addr, sizeof(struct in_addr));
-	}
-
-	smb_log_verbose("connecting to %s (%s:%d) %s\n", address, inet_ntoa(addr.sin_addr), port, name);
-
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(port);
-
+	memcpy(&addr.sin_addr, address, sizeof(struct in_addr));
 	if (conn->sock <= 0) {
 		conn->sock = socket(PF_INET, SOCK_STREAM, 0);
 		if (conn->sock < 0) return -1;
-	}	
-	
-	if (connect(conn->sock, (struct sockaddr*)&addr, sizeof(addr)) ||			
-			(port == 139 && smb_nbt_session(conn->sock, name))) {
-		smb_log_error("connection to %s (%s:%d) failed: %s\n", name, inet_ntoa(addr.sin_addr), port, strerror(errno));
-		return -1;
 	}
-	
+	if (port) {
+		addr.sin_port =  htons(port);
+		smb_log_verbose("connecting to %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+		if (connect(conn->sock, (struct sockaddr*)&addr, sizeof(addr))) return -1;
+		if (port == 139 && smb_nbt_session(conn->sock, "", name)) return -1;
+	} else {
+		addr.sin_port =  htons(445);
+		smb_log_verbose("connecting to %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+		if (connect(conn->sock, (struct sockaddr*)&addr, sizeof(addr))) {
+			addr.sin_port =  htons(139);
+			smb_log_verbose("connecting to %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+			if (connect(conn->sock, (struct sockaddr*)&addr, sizeof(addr))) return -1;
+			if (smb_nbt_session(conn->sock, "", name)) return -1;
+		}
+	}
 	conn->connected = 1;
 	conn->i_size = SMB_MAX_BUFFER + 4;
 	if (!conn->i) conn->i = malloc(conn->i_size);
@@ -114,6 +128,15 @@ int smb_disconnect_raw(smb_connect_p c) {
 	close(c->sock);
 	ZERO_STRUCT(c);
 	return 0;
+}
+
+int smb_shutdown(smb_connect_p c) {
+	if (!c->connected) {
+		errno = ENOTCONN;
+		return -1;
+	}
+	c->connected = 0;
+	return shutdown(c->sock, 0);
 }
 
 int smb_connected(smb_connect_p c) {
@@ -133,7 +156,7 @@ size_t smb_send_raw(smb_connect_p c, void *buf, size_t len) {
 	while (len) {
 		r = send(c->sock, p, len, 0);
 		if (r < 0) {
-			c->connected = 0;
+			smb_shutdown(c);
 			return -1;
 		}
 		len -= r;
@@ -161,7 +184,7 @@ int smb_send(smb_connect_p c) {
 	while (len) {
 		r = send(c->sock, p, len, 0);
 		if (r < 0) {
-			c->connected = 0;
+			smb_shutdown(c);
 			return -1;
 		}
 		len -= r;
@@ -173,7 +196,7 @@ int smb_send(smb_connect_p c) {
 
 int smb_recv_skip_sock(int sock, int size) {
 	unsigned char buf;
-	int res;	
+	int res;
 	smb_log_debug("skip %d bytes\n", size);
 	while (size > 0) {
 		res = recv(sock, &buf, 1, MSG_WAITALL);
@@ -181,8 +204,8 @@ int smb_recv_skip_sock(int sock, int size) {
 		if (res < 0) return -1;
 		size--;
 		smb_log_noisy("%02X ", buf);
-	}
-	smb_log_noisy("\n", size);
+		if (size % 16 == 0) smb_log_noisy("\n");
+	}	
 	return 0;
 }
 
@@ -192,7 +215,7 @@ int smb_recv_skip(smb_connect_p c, int size) {
 		return -1;
 	}
 	if (smb_recv_skip_sock(c->sock, size)) {
-		c->connected = 0;
+		smb_shutdown(c);
 		return -1;
 	}
 	return 0;
@@ -214,7 +237,7 @@ int smb_recv_size(smb_connect_p c) {
 		while (l) {
 			r = recv(c->sock, p, l, MSG_WAITALL);
 			if (r < 0) {
-				c->connected = 0;
+				smb_shutdown(c);
 				return -1;
 			}
 			l -= r;
@@ -243,7 +266,7 @@ size_t smb_recv_raw(smb_connect_p c, void *buf, size_t len) {
 	}
 	
 	if (size > len) {
-		smb_log_error("smb_recv_raw: buffer to small %d packet size %d\n", len, size);
+		smb_log_error("smb_recv_raw: buffer to small %d - packet size is %d\n", len, size);
 		smb_recv_skip(c, size);
 		errno = ENOMEM;		
 		return -1;
@@ -255,7 +278,7 @@ size_t smb_recv_raw(smb_connect_p c, void *buf, size_t len) {
 	while (l) {
 		r = recv(c->sock, p, l, MSG_WAITALL);
 		if (r < 0) {
-			c->connected = 0;
+			smb_shutdown(c);
 			return -1;
 		}
 		l -= r;
@@ -281,7 +304,7 @@ int smb_recv(smb_connect_p c) {
 	do {
 		size = recv(c->sock, c->i + c->i_done, c->i_len - c->i_done, MSG_WAITALL);
 		if (size < 0) {
-			c->connected = 0;
+			smb_shutdown(c);
 			return -1;
 		}
 		c->i_done += size;
@@ -305,7 +328,7 @@ int smb_recv(smb_connect_p c) {
 	if (smb_check_packet(c->i, c->i_len)) {
 		smb_log_error("incorect packet %d bytes\n", c->i_len);
 		smb_log_hex_noisy(c->i, c->i_len);
-		c->connected = 0;
+		smb_shutdown(c);
 		errno = EIO;
 		return -1;
 	}
@@ -330,8 +353,9 @@ int smb_request(smb_connect_p c) {
 		smb_log_packet("i", c->i);
 		smb_log_packet("o", c->o);
 
-		c->connected = 0;
 
+		smb_shutdown(c);
+		
 		errno = EIO;
 		return -1;
 	}
@@ -358,8 +382,10 @@ int smb_recv_async(smb_connect_p c) {
 	}
 	
 	if (c->i_done >= 0) {
+		/*recv data*/
 		size = recv(c->sock, c->i + c->i_done, c->i_len - c->i_done, MSG_DONTWAIT);
 	} else {
+		/*skip junk*/
 		size = -c->i_done;
 		if (size > c->i_size) size = c->i_size;
 		size = recv(c->sock, c->i, size, MSG_DONTWAIT);
@@ -385,7 +411,7 @@ int smb_recv_async(smb_connect_p c) {
 			}
 		}
 	}
-	if (c->i_done == c->i_len) return 0;	
+	if (c->i_done == c->i_len) return 0;
 	errno = EAGAIN;
 	return -1;
 }

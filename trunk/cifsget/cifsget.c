@@ -17,6 +17,7 @@ usage: cifsget OPTION | URI | UNC | SHORT ...\n\
   -h                    show this message and exit\n\
   -d [0-6]              debug level, default - 3\n\
   -i ip			destination ip\n\
+  -p port		destination port\n\
 ");
 }
 
@@ -60,6 +61,11 @@ int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const 
 	static char buf[64*1024];
 	int res, len;
 	off_t off, rem;
+
+	if (!smb_connected(c)) {
+		errno = ENOTCONN;
+		return -1;
+	}
 	
 	fid = smb_open(c, src, OPEN_FLAGS_OPEN_READ);
 	if (fid < 0) {
@@ -126,13 +132,18 @@ err:
 }
 
 int smb_download_dir(smb_connect_p c, const char *src, const char *dst) {
-	char *mask, *sname, *dname, *lname;	
+	char *mask = NULL, *sname, *dname, *lname;	
 	smb_dirinfo_t di;
 	smb_find_p f;
 
+	if (!smb_connected(c)) {
+		errno = ENOTCONN;
+		goto err;
+	}	
+
 	if (mkdir(dst, 0755) && errno != EEXIST) {
 		perror(dst);
-		return -1;
+		goto err;
 	}
 	
 	asprintf(&mask, "%s\\*", src);
@@ -152,9 +163,21 @@ int smb_download_dir(smb_connect_p c, const char *src, const char *dst) {
 		smb_print_file(&di, lname);
 		
 		if (di.attributes & FILE_ATTRIBUTE_DIRECTORY) {
-			smb_download_dir(c, sname, dname);
+			if (smb_download_dir(c, sname, dname)) {
+				perror(sname);
+				if (!smb_connected(c)) {
+					errno = ENOTCONN;
+					goto err;
+				}
+			}			
 		} else {
-			smb_download_file(c, &di, sname, dname);
+			if (smb_download_file(c, &di, sname, dname)) {
+				perror(sname);
+				if (!smb_connected(c)) {
+					errno = ENOTCONN;
+					goto err;
+				}				
+			}
 		}
 
 		free(lname);
@@ -163,8 +186,11 @@ int smb_download_dir(smb_connect_p c, const char *src, const char *dst) {
 	}	
 	smb_find_close2(f);
 	free(mask);
-	
 	return 0;
+err:	
+	smb_find_close2(f);
+	free(mask);
+	return -1;
 }
 
 int smb_list_dir(smb_connect_p c, const char *path) {
@@ -192,14 +218,14 @@ int smb_list_dir(smb_connect_p c, const char *path) {
 	return 0;
 }
 
-int smb_list_node(const char *addr, const char *name) {
+int smb_list_node(smb_uri_p uri) {
 	smb_connect_p c;
 	smb_node_enum_t e;
 	smb_node_t n;
 	
 	int dc, i;
 	char **dom;
-	c = smb_connect_tree(addr, name, "IPC$");
+	c = smb_connect_tree(uri->addr, uri->port, uri->name, "IPC$");
 	
 	if (!c) return -1;
 	
@@ -266,7 +292,7 @@ int smb_ls(smb_uri_p uri) {
 			smb_list_dir(c, "");
 		}
 	} else {
-		smb_list_node(uri->addr, uri->name);
+		smb_list_node(uri);
 	}
 	
 	return 0;
@@ -343,14 +369,13 @@ int main(int argc, char * const argv[]) {
 	flow = smb_flow_new();
 
 	smb_uri_p uri;
-	char *addr = NULL;
 	int list = 0;
 	int opt;
 
 	NEW_STRUCT(uri);	
 	
 	do {
-		opt = getopt(argc, argv, "-ls:o:O:d:i:h");
+		opt = getopt(argc, argv, "-ls:o:O:d:i:p:h");
 		switch (opt) {
 			case 'd':
 				smb_log_level = atoi(optarg);
@@ -368,7 +393,11 @@ int main(int argc, char * const argv[]) {
 				list = 1;
 				break;
 			case 'i':
-				addr = strdup(optarg);
+				free(uri->addr);
+				uri->addr = strdup(optarg);
+				break;
+			case 'p':
+				uri->port = atoi(optarg);
 				break;
 			case -1:
 			case 1:
@@ -378,13 +407,9 @@ int main(int argc, char * const argv[]) {
 						list = 0;
 					} else
 						smb_get(uri);
+					smb_uri_free(uri);
 				}
-				smb_uri_free(uri);
 				if (optarg) smb_uri_parse(uri, optarg);
-				if (addr) {
-					uri->addr = addr;
-					addr = NULL;
-				}
 				break;
 			case '?':
 			case 'h':

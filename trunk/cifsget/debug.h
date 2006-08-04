@@ -5,7 +5,7 @@
 /*
 smb_log_msg	always
 smb_log_hex	always
-smb_log_struct	noisy
+smb_log_struct	debug
 smb_log_packet  debug & noisy
 smb_log_trans	debug & noisy
  * */
@@ -37,7 +37,7 @@ void smb_log_flush(void);
 
 #define smb_log_struct_any(base, type)		do { smb_log_msg("struct %s %p\n", #type, base); ITR_##type(base, _PRINT_ANY); } while(0)
 
-#define smb_log_struct(base, type) 	if (smb_log_level >= SMB_LOG_NOISY) smb_log_struct_any(base, type)
+#define smb_log_struct(base, type) 	if (smb_log_level >= SMB_LOG_DEBUG) smb_log_struct_any(base, type)
 
 #define SMB_LOG_QUIET   0
 #define SMB_LOG_ERROR   1

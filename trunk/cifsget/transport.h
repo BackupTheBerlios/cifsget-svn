@@ -5,6 +5,7 @@
 
 typedef struct smb_connect_s {
 	int sock;
+	
 	/* I/O buffers*/
 	char *i, *o;
 	
@@ -16,13 +17,17 @@ typedef struct smb_connect_s {
 	int max_buffer_size;
 	int max_raw_size;
 	int capabilities;
-	int server_time_zone;	
+	int server_time_zone;
 
 	int connected;
 } smb_connect_t;
 typedef smb_connect_t *smb_connect_p;
 
-int smb_connect_raw(smb_connect_p conn, const char *address, int port, const char *name);
+int smb_resolve(const char *host, struct in_addr *addr);
+
+int smb_connect_raw(smb_connect_p conn, const struct in_addr *address, int port, const char *name);
+
+int smb_shutdown(smb_connect_p c);
 int smb_disconnect_raw(smb_connect_p conn);
 
 int smb_connected(smb_connect_p c);

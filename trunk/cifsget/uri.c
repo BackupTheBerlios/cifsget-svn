@@ -73,8 +73,6 @@ int smb_uri_parse(smb_uri_p uri, const char *str) {
 	char *p, *n, *d, *s;
 	int i = 0;
 
-	ZERO_STRUCTP(uri);
-	
 	p = iconv_local_to_utf8(str);
 	smb_uri_unescape(p);
 	s = iconv_utf8_to_dos(p);
@@ -82,7 +80,7 @@ int smb_uri_parse(smb_uri_p uri, const char *str) {
 
 	p = strstr(s, "://");
 	if (p) {
-		uri->scheme = stredup(s, p);
+		if (!uri->scheme) uri->scheme = stredup(s, p);
 		p += 3;		
 	} else {
 		p = s;
@@ -98,10 +96,11 @@ int smb_uri_parse(smb_uri_p uri, const char *str) {
 		switch (i) {
 			case 0:
 				//if (smb_parse_dest(p, uri)) return -1;
-				uri->name = stredup(p, n);
+				if (!uri->name) uri->name = stredup(p, n);
+				if (!uri->addr) uri->addr = strdup(uri->name);
 				break;
 			case 1:
-				uri->tree = stredup(p, n);
+				if (!uri->tree) uri->tree = stredup(p, n);
 				break;
 			default:
 				*d++ = '\\';
@@ -115,9 +114,9 @@ int smb_uri_parse(smb_uri_p uri, const char *str) {
 	*d = '\0';
 	p = strrchr(uri->path, '\\');
 	if (p) {
-		uri->file = strdup(p+1);
-		uri->dir = stredup(uri->path, p);
-	}	
+		if (!uri->file) uri->file = strdup(p+1);
+		if (!uri->dir) uri->dir = stredup(uri->path, p);
+	}
 	free(s);
 	return 0;
 }
@@ -132,4 +131,5 @@ void smb_uri_free(smb_uri_p uri) {
 	free(uri->login);
 	free(uri->password);
 	free(uri->addr);
+	ZERO_STRUCTP(uri);
 }
