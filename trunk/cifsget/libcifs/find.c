@@ -33,10 +33,11 @@ int smb_find_first_req(smb_connect_p c, const char *mask) {
 
 	p = PTR_OFINDFIRST_MASK(b);
 	if (c->capabilities & CAP_UNICODE) {
+		//WTF!!!???
 		//WRITE_ALIGN(p, c->o, 2);
 		char *tmp = p;
 		WRITE_STRING_UCS(p, c->o_end, mask);
-		smb_path_fix_oem(tmp);
+		smb_path_fix_ucs(tmp);
 	} else {
 		WRITE_STRING_OEM(p, c->o_end, mask);
 		smb_path_fix_oem(PTR_OFINDFIRST_MASK(b));
@@ -207,3 +208,4 @@ smb_dirinfo_p smb_info2(smb_connect_p c, const char *name) {
 	}
 	return d;
 }
+

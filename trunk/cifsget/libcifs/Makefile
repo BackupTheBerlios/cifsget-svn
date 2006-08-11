@@ -1,4 +1,4 @@
-SRCS=transport.c proto.c uri.c transact.c find.c rap.c debug.c codepage.c
+SRCS=transport.c proto.c transact.c find.c rap.c debug.c codepage.c
 OBJS=$(SRCS:.c=.o)
 CFLAGS=-g -std=c99 -Wall
 LIBNAME=libcifs.a

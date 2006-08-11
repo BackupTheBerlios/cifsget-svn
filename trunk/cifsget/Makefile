@@ -1,12 +1,10 @@
 CFLAGS=-g -std=c99 -Wall
-OBJECTS=flow.o mirror.o human.o libcifs/libcifs.a
+OBJECTS=flow.o mirror.o human.o uri.o libcifs/libcifs.a
 PREFIX=${HOME}
 
-all: cifsget
+all: libs cifsget
 
-.PHONY: libcifs/libcifs.a
-
-libcifs/libcifs.a:
+libs:
 	make -C libcifs
 
 install: all
@@ -20,7 +18,7 @@ cifsget: cifsget.o ${OBJECTS}
 
 cifsmirror: cifsmirror.o ${OBJECTS}
 	${CC} -o $@ $^ ${LDFLAGS}
-	
+
 clean:
 	rm -f *.o cifsmirror cifsget tags fusesmb
 	make -C libcifs clean
@@ -34,4 +32,4 @@ dist: distclean
 
 fusesmb: transport.o proto.o transact.o debug.o find.o rap.o fusesmb.o uri.o codepage.o
 	${CC} -o $@ $^ ${LDFLAGS} -lfuse
-	
+

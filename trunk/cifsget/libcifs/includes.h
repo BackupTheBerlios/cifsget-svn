@@ -47,8 +47,6 @@
 #include "atom.h"
 #include "struct.h"
 
-#include "uri.h"
-
 #include "transport.h"
 #include "proto.h"
 #include "transact.h"

@@ -31,6 +31,10 @@ void smb_print_file(smb_dirinfo_p di) {
 	}
 }
 
+smb_connect_p smb_connect_uri(smb_uri_p uri) {
+	return smb_connect_tree(uri->addr, uri->port, uri->name, uri->tree);
+}
+
 int smb_print_node(smb_node_p n) {
 	char *type;
 	switch (n->type) {

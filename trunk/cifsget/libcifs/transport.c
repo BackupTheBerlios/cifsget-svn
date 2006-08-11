@@ -78,7 +78,7 @@ int smb_resolve(const char *host, struct in_addr *addr) {
 	if (inet_aton(host, addr)) return 0;
 	/* DNS */
 	if ((hp = gethostbyname(host))) {
-		memcpy(hp->h_addr, addr, sizeof(struct in_addr));
+		memcpy(addr, hp->h_addr, sizeof(struct in_addr));
 		return 0;
 	}
 	/* FAILURE */

@@ -16,7 +16,6 @@ int smb_tree_disconnect(smb_connect_p c, int tid);
 
 smb_connect_p smb_connect(const char *host,  int port, const char *name);
 smb_connect_p smb_connect_tree(const char *host, int port, const char *name, const char *tree);
-smb_connect_p smb_connect_uri(smb_uri_p uri);
 int smb_disconnect(smb_connect_p c);
 
 int smb_open(smb_connect_p c, const char *name, int mode);

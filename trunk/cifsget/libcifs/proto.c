@@ -365,7 +365,3 @@ smb_connect_p smb_connect_tree(const char *host, int port, const char *name, con
 	return c;
 }
 
-smb_connect_p smb_connect_uri(smb_uri_p uri) {
-	return smb_connect_tree(uri->addr, uri->port, uri->name, uri->tree);
-}
-
