@@ -1,8 +1,6 @@
 #ifndef FLOW_H
 #define FLOW_H
 
-
-
 /* time line: ----- start ------------------------ a ---------- b ----- c -----> */
 
 

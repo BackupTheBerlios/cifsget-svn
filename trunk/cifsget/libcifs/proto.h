@@ -3,7 +3,10 @@
 
 time_t smb_nttime2unix(int64_t nttime);
 char *smb_nttime2unix_str(int64_t nttime);
-	
+
+void smb_path_fix_oem (char *path);
+void smb_path_fix_ucs (char *path);
+
 int smb_negotiate(smb_connect_p c);
 int smb_sessionsetup(smb_connect_p c);
 

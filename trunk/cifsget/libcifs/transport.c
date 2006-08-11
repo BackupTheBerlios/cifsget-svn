@@ -116,8 +116,10 @@ int smb_connect_raw(smb_connect_p conn, const struct in_addr *address, int port 
 	conn->connected = 1;
 	conn->i_size = SMB_MAX_BUFFER + 4;
 	if (!conn->i) conn->i = malloc(conn->i_size);
+	conn->i_end = conn->i + conn->i_size;
 	conn->o_size = SMB_MAX_BUFFER + 4;
 	if (!conn->o) conn->o = malloc(conn->o_size);
+	conn->o_end = conn->o + conn->o_size;
 	return 0;
 }
 

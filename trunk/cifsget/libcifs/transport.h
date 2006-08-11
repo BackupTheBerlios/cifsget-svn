@@ -8,6 +8,8 @@ typedef struct smb_connect_s {
 	
 	/* I/O buffers*/
 	char *i, *o;
+	/* I/O buffers ends */
+	char *i_end, *o_end;
 	
 	/* async I/O routine*/
 	int i_size, i_len, i_done;
@@ -18,7 +20,6 @@ typedef struct smb_connect_s {
 	int max_raw_size;
 	int capabilities;
 	int server_time_zone;
-
 	int connected;
 } smb_connect_t;
 typedef smb_connect_t *smb_connect_p;

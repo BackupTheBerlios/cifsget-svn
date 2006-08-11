@@ -17,8 +17,4 @@
 
 #define SMB_MAX_RAW (60*1024)
 
-#define SMB_UTF8_CODEPAGE	"UTF8"
-#define SMB_LOCAL_CODEPAGE	"CP1251"
-#define SMB_DOS_CODEPAGE	"866"
-
 #endif /* CONFIG_H */

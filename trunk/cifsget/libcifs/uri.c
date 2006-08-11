@@ -73,10 +73,8 @@ int smb_uri_parse(smb_uri_p uri, const char *str) {
 	char *p, *n, *d, *s;
 	int i = 0;
 
-	p = iconv_local_to_utf8(str);
-	smb_uri_unescape(p);
-	s = iconv_utf8_to_dos(p);
-	free(p);
+	s = strdup(str);
+	smb_uri_unescape(s);
 
 	p = strstr(s, "://");
 	if (p) {

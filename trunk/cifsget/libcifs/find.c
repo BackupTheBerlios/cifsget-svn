@@ -1,10 +1,9 @@
 #include "includes.h"
 
-void smb_build_dirinfo(smb_dirinfo_p d, char *p) {
+void smb_build_dirinfo(smb_connect_p c, smb_dirinfo_p d, char *p) {
 	int nl;
 	nl = GET_DIRINFO_NAME_LEN(p);
 	nl = (nl<SMB_MAX_PATH)?nl:(SMB_MAX_PATH-1);
-	
 	d->creation_time = GET_DIRINFO_CREATION_TIME(p);
 	d->access_time = GET_DIRINFO_ACCESS_TIME(p);
 	d->write_time = GET_DIRINFO_WRITE_TIME(p);
@@ -12,13 +11,15 @@ void smb_build_dirinfo(smb_dirinfo_p d, char *p) {
 	d->file_size = GET_DIRINFO_FILE_SIZE(p);
 	d->allocation_size = GET_DIRINFO_ALLOCATION_SIZE(p);
 	d->attributes = GET_DIRINFO_ATTRIBUTES(p);
-	
-	memcpy(d->name, PTR_DIRINFO_NAME(p), nl);
-	d->name[nl] = '\0';
+	if (c->capabilities & CAP_UNICODE) {
+		smb_cp_block(smb_cp_ucs_to_sys, d->name, sizeof(d->name), PTR_DIRINFO_NAME(p), nl);
+	} else {
+		smb_cp_block(smb_cp_oem_to_sys, d->name, sizeof(d->name), PTR_DIRINFO_NAME(p), nl);
+	}
 }
 
 int smb_find_first_req(smb_connect_p c, const char *mask) {
-	char *o=c->o, *b, *w;
+	char *o=c->o, *b, *w, *p;
 	smb_trans_req(c, SMBtrans2, NULL, 1, TRANSACT2_FINDFIRST);
 	
 	w = PTR_PACKET_W(o);
@@ -29,10 +30,18 @@ int smb_find_first_req(smb_connect_p c, const char *mask) {
 	SET_OFINDFIRST_FLAGS(b, FLAG_TRANS2_FIND_CLOSE_IF_END);
 	SET_OFINDFIRST_INFORMATION_LEVEL(b, SMB_FIND_DIRECTORY_INFO);
 	SET_OFINDFIRST_SEARCH_STORAGE_TYPE(b, 0);
-	strcpy(PTR_OFINDFIRST_MASK(b), mask);
 
-	SETLEN_PACKET_B(o, LEN_OFINDFIRST(b));
-
+	p = PTR_OFINDFIRST_MASK(b);
+	if (c->capabilities & CAP_UNICODE) {
+		//WRITE_ALIGN(p, c->o, 2);
+		char *tmp = p;
+		WRITE_STRING_UCS(p, c->o_end, mask);
+		smb_path_fix_oem(tmp);
+	} else {
+		WRITE_STRING_OEM(p, c->o_end, mask);
+		smb_path_fix_oem(PTR_OFINDFIRST_MASK(b));
+	}
+	END_PACKET_B(o, p);
 	SET_OTRANS_PARAM_COUNT(w, LEN_PACKET_B(o));
 	SET_OTRANS_TOTAL_PARAM_COUNT(w, LEN_PACKET_B(o));
 	
@@ -118,7 +127,7 @@ loop:
 		
 		if (f->count == 0) return 1;
 	}
-	smb_build_dirinfo(d, f->cur);
+	smb_build_dirinfo(f->c, d, f->cur);
 	f->cur += GET_DIRINFO_NEXT_ENTRY_OFFSET(f->cur);
 	f->count--;
 	if ((d->attributes & FILE_ATTRIBUTE_DIRECTORY) && (!strcmp(d->name, ".") || !strcmp(d->name, ".."))) goto loop;
@@ -184,7 +193,7 @@ int smb_info(smb_connect_p c, const char *name, smb_dirinfo_p d) {
 		return -1;
 	}
 	
-	smb_build_dirinfo(d, t.data);
+	smb_build_dirinfo(c, d, t.data);
 	smb_trans_free(&t);
 	return 0;
 }

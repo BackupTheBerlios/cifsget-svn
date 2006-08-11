@@ -7,11 +7,11 @@ char* smb_rap_begin(smb_connect_p c, int rap_code, const char *param_dest, const
 
 	p = PTR_OTRANS_PARAM(c->o);
 	
-	PUSH_WORD(p, rap_code);
-	PUSH_STRING(p, param_dest);
-	PUSH_STRING(p, data_desc);
-	PUSH_WORD(p, 1); /* info_level */
-	PUSH_WORD(p, SMB_TRANS_MAX_DATA_COUNT);
+	WRITE_WORD(p, rap_code);
+	WRITE_STRING(p, param_dest);
+	WRITE_STRING(p, data_desc);
+	WRITE_WORD(p, 1); /* info_level */
+	WRITE_WORD(p, SMB_TRANS_MAX_DATA_COUNT);
 	
 	return p;
 }
@@ -35,8 +35,8 @@ int smb_shareenum_req(smb_connect_p c) {
 int smb_serverenum_req(smb_connect_p c, const char *workgroup) {
 	char *p;
 	p = smb_rap_begin(c, 104, "WrLehDz", "B16BBDz");
-	PUSH_LONG(p, -1);
-	PUSH_STRING(p, workgroup);
+	WRITE_LONG(p, -1);
+	WRITE_STRING(p, workgroup);
 	smb_rap_end(c->o, p);
 	return 0;
 }
@@ -44,8 +44,8 @@ int smb_serverenum_req(smb_connect_p c, const char *workgroup) {
 int smb_domainenum_req(smb_connect_p c) {
 	char *p;
 	p = smb_rap_begin(c, 104, "WrLehDz", "B16BBDz");
-	PUSH_LONG(p, 0x80000000);
-	PUSH_STRING(p, "");
+	WRITE_LONG(p, 0x80000000);
+	WRITE_STRING(p, "");
 	smb_rap_end(c->o, p);
 	return 0;
 }
@@ -127,29 +127,24 @@ int smb_domain_enum(smb_connect_p c, smb_node_enum_p e) {
 }
 
 int smb_node_next(smb_connect_p c, smb_node_enum_p e, smb_node_p n) {
-	int nl;
 	char *comm;
 	if (!e->count) {
 		smb_trans_free(&e->t);
 		return 1;
 	}
 	ZERO_STRUCTP(n);
-	n->type = e->type;	
+	n->type = e->type;
 	if (e->type == SMB_NODE_SHARE) {
-		nl = LEN_SHAREENUM_NAME(e->cur);
-		memcpy(n->name, PTR_SHAREENUM_NAME(e->cur), nl);
-		n->name[nl] = '\0';
-		n->attributes = GET_SHAREENUM_TYPE(e->cur);
+		smb_cp_block(smb_cp_oem_to_sys, n->name, sizeof(n->name), PTR_SHAREENUM_NAME(e->cur), LEN_SHAREENUM_NAME(e->cur));
 		comm = e->t.data + (GET_SHAREENUM_COMMENT(e->cur) & 0x0000FFFF) - e->conv;
-		strncpy(n->comment, comm, sizeof(n->comment)-1);
+		smb_cp_tobuf(smb_cp_oem_to_sys, n->comment, sizeof(n->comment), comm);
+		n->attributes = GET_SHAREENUM_TYPE(e->cur);
 		e->cur += LEN_SHAREENUM(e->cur);
-	} else {
-		nl = LEN_SERVERENUM_NAME(e->cur);
-		memcpy(n->name, PTR_SERVERENUM_NAME(e->cur), nl);
-		n->name[nl] = '\0';
-		n->attributes = GET_SERVERENUM_TYPE(e->cur);
+	} else {		
+		smb_cp_block(smb_cp_oem_to_sys, n->name, sizeof(n->name), PTR_SERVERENUM_NAME(e->cur), LEN_SERVERENUM_NAME(e->cur));
 		comm = e->t.data + (GET_SERVERENUM_COMMENT(e->cur) & 0x0000FFFF) - e->conv;
-		strncpy(n->comment, comm, sizeof(n->comment)-1);		
+		smb_cp_tobuf(smb_cp_oem_to_sys, n->comment, sizeof(n->comment), comm);
+		n->attributes = GET_SERVERENUM_TYPE(e->cur);
 		e->cur += LEN_SERVERENUM(base);
 	}
 	e->count--;

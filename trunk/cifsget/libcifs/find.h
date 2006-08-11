@@ -23,7 +23,7 @@ typedef struct smb_find_s {
 } smb_find_t;
 typedef smb_find_t *smb_find_p;
 
-void smb_build_dirinfo(smb_dirinfo_p d, char *p);
+void smb_build_dirinfo(smb_connect_p c, smb_dirinfo_p d, char *p);
 
 int smb_find_first_req(smb_connect_p c, const char *mask);
 int smb_find_next_req(smb_connect_p c, int sid);

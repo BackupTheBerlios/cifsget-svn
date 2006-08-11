@@ -23,7 +23,12 @@ void smb_trans_req(smb_connect_p c, int command, char *name, int setup_count, ..
 
 	b = PTR_PACKET_B(o);
 	if (name) {
-		PUSH_STRING(b, name);
+		if (c->capabilities & CAP_UNICODE) {
+			WRITE_ALIGN(b,c->o,2);
+			WRITE_STRING_UCS(b, c->o_end, name);
+		} else {
+			WRITE_STRING_OEM(b, c->o_end, name);
+		}
 	}
 	
 	SET_OTRANS_PARAM_COUNT(w, 0);

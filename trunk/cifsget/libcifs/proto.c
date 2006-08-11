@@ -9,6 +9,14 @@ char *smb_nttime2unix_str(int64_t nttime) {
 	return ctime(&t);
 }
 
+void smb_path_fix_oem (char *path) {
+	for (char *p = path; *p ; p++) if (*p == '/') *p = '\\';
+}
+
+void smb_path_fix_ucs (char *path) {
+	for (uint16_t *p = (uint16_t *)path; *p ; p++) if (*p == '/') *p = '\\';
+}
+
 int smb_negotiate(smb_connect_p c) {
 	char *o=c->o, *p;
 
@@ -18,8 +26,8 @@ int smb_negotiate(smb_connect_p c) {
 	SET_PACKET_MAGIC(o, SMB_MAGIC);
 	SET_PACKET_COMMAND(o, SMBnegprot);
 	SET_PACKET_STATUS(o, 0);
-	SET_PACKET_FLAGS(o, FLAG_CANONICAL_PATHNAMES | FLAG_CASELESS_PATHNAMES);
-	SET_PACKET_FLAGS2(o, FLAGS2_LONG_PATH_COMPONENTS | FLAGS2_IS_LONG_NAME | FLAGS2_32_BIT_ERROR_CODES);
+	SET_PACKET_FLAGS(o, FLAG_CANONICAL_PATHNAMES | FLAG_CASELESS_PATHNAMES );
+	SET_PACKET_FLAGS2(o, FLAGS2_LONG_PATH_COMPONENTS | FLAGS2_IS_LONG_NAME | FLAGS2_32_BIT_ERROR_CODES | FLAGS2_UNICODE_STRINGS);
 	SET_PACKET_PIDH(o, 0);
 	SET_PACKET_SIGNATURE(o, 0ll);
 	SET_PACKET_UNUSED(o, 0);
@@ -31,7 +39,7 @@ int smb_negotiate(smb_connect_p c) {
 	SETLEN_PACKET_W(o, 0);
 	
 	p = PTR_PACKET_B(o);
-	PUSH_STRING(p, "\x02NT LM 0.12");
+	WRITE_STRING(p, "\x02NT LM 0.12");
 	END_PACKET_B(o, p);
 	
 	if (smb_request(c)) return -1;
@@ -48,7 +56,6 @@ int smb_negotiate(smb_connect_p c) {
 	c->capabilities = GET_INEGOT_CAPABILITIES(p);
 	c->server_time_zone = GET_INEGOT_SERVERTIMEZONE(p);
 	
-
 	smb_log_struct(p, INEGOT);
 
 	return 0;
@@ -70,23 +77,28 @@ int smb_sessionsetup(smb_connect_p c) {
 	SET_OSESSIONSETUP_IPWDLEN(p, 0);
 	SET_OSESSIONSETUP_PWDLEN(p, 0);
 	SET_OSESSIONSETUP_RESERVED(p, 0);
-	SET_OSESSIONSETUP_CAPABILITIES(p, CAP_STATUS32 |CAP_RAW_MODE|CAP_LARGE_FILES);
-
+	SET_OSESSIONSETUP_CAPABILITIES(p, c->capabilities & (CAP_STATUS32 | CAP_RAW_MODE | CAP_LARGE_FILES | CAP_UNICODE));
 
 	smb_log_struct(p, OSESSIONSETUP);
-
 		
 	p = PTR_PACKET_B(o);
 	
-	PUSH_STRING(p, "GUEST");
-	PUSH_STRING(p, "");
-	PUSH_STRING(p, "LINUX");
-	PUSH_STRING(p, "XSMB");
+	if (c->capabilities & CAP_UNICODE) {
+		WRITE_ALIGN(p, c->o, 2);
+		WRITE_STRING_UCS(p, c->o_end, "GUEST");
+		WRITE_STRING_UCS(p, c->o_end, "");
+		WRITE_STRING_UCS(p, c->o_end, "LINUX");
+		WRITE_STRING_UCS(p, c->o_end, "LIBCIFS");
+	} else {
+		WRITE_STRING_OEM(p, c->o_end, "GUEST");
+		WRITE_STRING_OEM(p, c->o_end, "");
+		WRITE_STRING_OEM(p, c->o_end, "LINUX");
+		WRITE_STRING_OEM(p, c->o_end, "LIBCIFS");
+	}
 
 	END_PACKET_B(o, p);
-		
+
 	if (smb_request(c)) return -1;
-	
 
 	p = GET_PACKET_W(c->i);
 	smb_log_struct(p, ISESSIONSETUP);
@@ -108,14 +120,22 @@ int smb_tree_connect(smb_connect_p c, const char *server, const char *share) {
 	SETLEN_PACKET_W(o, LEN_OTREECONNECT(p));
 	SET_OTREECONNECT_ANDX(p, 0xFF);
 	SET_OTREECONNECT_FLAGS(p, 0);
-	SET_OTREECONNECT_PWDLEN(p, 0);
+	SET_OTREECONNECT_PWDLEN(p, 1);
 
 
 	smb_log_struct(p, OTREECONNECT);
 
 	p = GET_PACKET_B(o);
-	PUSH_FORMAT(p, "\\\\%s\\%s", server, share);
-	PUSH_STRING(p, "?????");
+	WRITE_BYTE(p, 0);
+	if (c->capabilities & CAP_UNICODE) {
+		WRITE_BUF_UCS(p, c->o_end, "\\\\");
+		WRITE_BUF_UCS(p, c->o_end, server);
+		WRITE_BUF_UCS(p, c->o_end, "\\");
+		WRITE_STRING_UCS(p, c->o_end, share);
+	} else {
+		WRITE_FORMAT(p, "\\\\%s\\%s", server, share);
+	}
+	WRITE_STRING(p, "?????");
 	END_PACKET_B(o, p);
 	
 	if (smb_request(c)) return -1;
@@ -162,17 +182,24 @@ int smb_open(smb_connect_p c, const char *name, int mode) {
 	SET_PACKET_COMMAND(o, SMBopen);
 			
 	p = PTR_PACKET_W(o);
-	PUSH_WORD(p, mode);
-	PUSH_WORD(p, 0x37);
+	WRITE_WORD(p, mode);
+	WRITE_WORD(p, 0x37);
 	END_PACKET_W(o, p);
 	
 	p = PTR_PACKET_B(o);
-	PUSH_BYTE(p, '\x04');
-	PUSH_STRING(p, name);
+	WRITE_BYTE(p, '\x04');
+	if (c->capabilities & CAP_UNICODE) {
+		WRITE_ALIGN(p, c->o, 2);
+		char *tmp = p;
+		WRITE_STRING_UCS(p, c->o_end, name);
+		smb_path_fix_ucs(tmp);		
+	} else {
+		char *tmp = p;
+		WRITE_STRING_OEM(p, c->o_end, name);
+		smb_path_fix_ucs(tmp);
+	}
 	END_PACKET_B(o, p);
-	
 	if (smb_request(c)) return -1;
-	
 	return GET_WORD(c->i, OFF_PACKET_W(c->i));
 }
 

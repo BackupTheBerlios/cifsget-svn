@@ -1,27 +1,27 @@
 ##ifndef STRUCT_H
 ##define STRUCT_H
 
-type	byte	1
-type	sbyte	1
+type	byte		1
+type	signed_byte	1
 
-type	word	2
-type	sword	2
-type	rword	2
+type	word		2
+type	signed_word	2
+type	be_word		2
 
-type	long	4
-type	slong	4
-type	rlong	4
+type	long		4
+type	signed_long	4
+type	be_long		4
 
-type 	quad	8
-type 	squad	8
+type 	quad		8
+type 	signed_quad	8
 
-type 	nttime	8
+type 	nt_time		8
 
 struct	packet
 	byte	type
 	byte	zero
-	rword 	length
-	rlong	magic
+	be_word	length
+	be_long	magic
 	byte	command
 	long	status
 	byte	flags
@@ -54,8 +54,8 @@ struct	inegot
         long  maxrawsize
         long  sessionkey
         long  capabilities
-	nttime  systemtime
-        sword  servertimezone
+	nt_time  systemtime
+        signed_word  servertimezone
         byte  encryptionkeylength
 end	inegot
 
@@ -193,10 +193,10 @@ end 	ifindnext
 struct 	dirinfo
 	long next_entry_offset
 	long file_index
-	nttime creation_time
-	nttime access_time
-	nttime write_time
-	nttime change_time
+	nt_time creation_time
+	nt_time access_time
+	nt_time write_time
+	nt_time change_time
 	quad file_size
 	quad allocation_size
 	long attributes
@@ -273,13 +273,13 @@ end 	oclose
 struct 	nbtheader
 	byte type
 	byte flags
-	rword length
+	be_word length
 end 	nbtheader
 
 struct 	nbtsession
 	byte type
 	byte flags
-	rword length
+	be_word length
 	byte dst_type
 	blob dst
 	byte src_type
