@@ -188,12 +188,23 @@ int smb_tree_disconnect(smb_connect_p c, int tid) {
 	return 0;
 }
 
-int smb_open(smb_connect_p c, const char *name, int mode) {
+int smb_open(smb_connect_p c, const char *name, int flags) {
 	char *o = c->o, *p;
+
+	int mode = 0;
 	
 	SET_PACKET_COMMAND(o, SMBopen);
 			
 	p = PTR_PACKET_W(o);
+	
+	if (flags & O_RDWR) {
+		mode |= OPEN_FLAGS_OPEN_RDWR;
+	} else if (flags & O_WRONLY) {
+		mode |= OPEN_FLAGS_OPEN_WRITE;
+	} else {
+		mode |= OPEN_FLAGS_OPEN_READ;
+	}
+	
 	WRITE_WORD(p, mode);
 	WRITE_WORD(p, 0x37);
 	END_PACKET_W(o, p);

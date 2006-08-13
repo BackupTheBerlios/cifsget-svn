@@ -3,6 +3,10 @@
 
 #define SMB_MAGIC	0xFF534D42	/* 0xFF 'S' 'M' 'B' */
 
+#define SMB_MAX_BUFFER 65535
+
+#define SMB_MAX_RAW (60*1024)
+
 typedef struct smb_connect_s {
 	int sock;
 	char *name;

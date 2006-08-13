@@ -1,6 +1,8 @@
 #ifndef FIND_H
 #define FIND_H
 
+#define SMB_MAX_PATH 260
+
 typedef struct smb_dirinfo_s {
 	int64_t creation_time;
 	int64_t access_time;
@@ -8,7 +10,8 @@ typedef struct smb_dirinfo_s {
 	int64_t change_time;
 	uint64_t file_size;
 	uint64_t allocation_size;
-	uint32_t attributes;
+	char directory;
+	//uint32_t attributes;
 	char name[SMB_MAX_PATH];
 } smb_dirinfo_t;
 typedef smb_dirinfo_t *smb_dirinfo_p;

@@ -1,20 +1,19 @@
 #ifndef LIBCIFS_INCLUDES_H
 #define LIBCIFS_INCLUDES_H
 
-#include "config.h"
-
-#include <assert.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
 
-#include <getopt.h>
-
 #ifdef WINDOWS
 
 #include <winsock.h>
+
+#ifndef MSG_WAITALL
+#define MSG_WAITALL 0
+#endif
 
 #else
 
@@ -25,36 +24,36 @@
 
 #endif
 
-
 #include <sys/types.h>
 #include <errno.h>
 #include <ctype.h>
 
-#include <dirent.h>
-
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
+
 #include <sys/time.h>
 #include <time.h>
-
-//defines from samba
-#include "smb.h"
-#include "trans2.h"
-#include "byteorder.h"
-
-#include "atom.h"
-#include "struct.h"
 
 #include "transport.h"
 #include "proto.h"
 #include "transact.h"
 #include "find.h"
 #include "rap.h"
-
 #include "debug.h"
+
+
+#ifdef _LIBCIFS
+
+#include "smb.h"
+#include "trans2.h"
+#include "doserr.h"
+#include "byteorder.h"
+
+#include "atom.h"
+#include "struct.h"
 #include "codepage.h"
+
+#endif
 
 #endif /* LIBCIFS_INCLUDES_H */
 

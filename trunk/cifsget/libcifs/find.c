@@ -10,7 +10,8 @@ void smb_build_dirinfo(smb_connect_p c, smb_dirinfo_p d, char *p) {
 	d->change_time = GET_DIRINFO_CHANGE_TIME(p);
 	d->file_size = GET_DIRINFO_FILE_SIZE(p);
 	d->allocation_size = GET_DIRINFO_ALLOCATION_SIZE(p);
-	d->attributes = GET_DIRINFO_ATTRIBUTES(p);
+	//d->attributes = GET_DIRINFO_ATTRIBUTES(p);
+	d->directory = GET_DIRINFO_ATTRIBUTES(p)&FILE_ATTRIBUTE_DIRECTORY ? 1 : 0;
 	if (c->capabilities & CAP_UNICODE) {
 		smb_cp_block(smb_cp_ucs_to_sys, d->name, sizeof(d->name), PTR_DIRINFO_NAME(p), nl);
 	} else {
@@ -129,7 +130,7 @@ loop:
 	smb_build_dirinfo(f->c, d, f->cur);
 	f->cur += GET_DIRINFO_NEXT_ENTRY_OFFSET(f->cur);
 	f->count--;
-	if ((d->attributes & FILE_ATTRIBUTE_DIRECTORY) && (!strcmp(d->name, ".") || !strcmp(d->name, ".."))) goto loop;
+	if (d->directory && (!strcmp(d->name, ".") || !strcmp(d->name, ".."))) goto loop;
 	return 0;
 }
 

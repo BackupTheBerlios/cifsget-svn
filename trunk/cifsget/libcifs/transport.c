@@ -1,13 +1,5 @@
 #include "includes.h"
 
-#include "doserr.h"
-
-#ifdef WINDOWS
-#ifndef MSG_WAITALL
-#define MSG_WAITALL 0
-#endif
-#endif
-
 int smb_recv_skip_sock(int sock, int size);
 
 static int smb_check_packet(char *p, int size) {
@@ -168,7 +160,6 @@ int smb_connect_raw(smb_connect_p conn, const struct in_addr *address, int port 
 }
 
 int smb_disconnect_raw(smb_connect_p c) {
-	assert(c);
 	free(c->i);
 	free(c->o);
 	close(c->sock);
@@ -185,8 +176,7 @@ int smb_shutdown(smb_connect_p c) {
 	return shutdown(c->sock, 0);
 }
 
-int smb_connected(smb_connect_p c) {
-	assert(c);
+int smb_connected(smb_connect_p c) {	
 	return c->connected;
 }
 

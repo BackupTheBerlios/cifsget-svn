@@ -1,6 +1,12 @@
 #ifndef TRANSACT_H
 #define TRANSACT_H
 
+#define SMB_TRANS_TIMEOUT 1000
+
+#define SMB_TRANS_MAX_SETUP_COUNT 255
+#define SMB_TRANS_MAX_PARAM_COUNT 1024
+#define SMB_TRANS_MAX_DATA_COUNT (60*1024)
+
 typedef struct smb_trans_s {
 	char *setup;
 	char *param;
