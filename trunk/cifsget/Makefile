@@ -1,4 +1,4 @@
-CFLAGS=-g -std=c99 -Wall
+CFLAGS=-g -std=c99 -Wall -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
 OBJECTS=flow.o human.o uri.o libcifs/libcifs.a
 PREFIX=${HOME}
 

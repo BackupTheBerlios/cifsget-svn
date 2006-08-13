@@ -25,9 +25,8 @@ usage: cifsget OPTION | URI | UNC | SHORT ...\n\
 smb_flow_p flow;
 int opt_dirsize = 0;
 
-void smb_print_file(smb_dirinfo_p di) {
-	int dir = di->attributes & FILE_ATTRIBUTE_DIRECTORY;
-	printf("%6s %s%s\n", (!dir || opt_dirsize) ? smb_hsize(di->file_size, NULL) : " <dir>" , di->name, dir ? "/":"");
+void smb_print_file(smb_dirinfo_p di) {	
+	printf("%6s %s%s\n", (!di->directory || opt_dirsize) ? smb_hsize(di->file_size, NULL) : " <dir>" , di->name, di->directory ? "/":"");
 }
 
 int smb_print_node(smb_node_p n) {
@@ -82,7 +81,7 @@ int smb_get_size_dir(smb_connect_p c, const char *path, const char *name, uint64
 	free(mask);	
 	
 	while (!smb_find_next(&fi, &di)) {
-		if (di.attributes & FILE_ATTRIBUTE_DIRECTORY) {
+		if (di.directory) {
 			char *pt, *nm;
 			asprintf(&pt, "%s/%s", path, di.name);
 			asprintf(&nm, "%s/%s", name, di.name);
@@ -100,7 +99,7 @@ int smb_get_size_dir(smb_connect_p c, const char *path, const char *name, uint64
 }
 
 int smb_calc_size(smb_connect_p c, const char *path, smb_dirinfo_p di) {
-	if (di->attributes & FILE_ATTRIBUTE_DIRECTORY) {
+	if (di->directory) {
 		smb_get_size_dir(c, path,  di->name, &di->file_size);
 		if (smb_log_level >= SMB_LOG_NORMAL) {
 			smb_print_status("");
@@ -121,7 +120,7 @@ int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const 
 		return -1;
 	}
 	
-	fid = smb_open(c, src, OPEN_FLAGS_OPEN_READ);
+	fid = smb_open(c, src, O_RDONLY);
 	if (fid < 0) {
 		perror(src);
 		goto err;
@@ -210,7 +209,7 @@ int smb_download_dir(smb_connect_p c, const char *src, const char *dst) {
 		
 		smb_print_file(&di);
 		
-		if (di.attributes & FILE_ATTRIBUTE_DIRECTORY) {
+		if (di.directory) {
 			if (smb_download_dir(c, sname, dname)) {
 				perror(sname);
 				if (!smb_connected(c)) {
@@ -250,7 +249,7 @@ int smb_list_dir(smb_connect_p c, const char *path) {
 		return -1;
 	}
 	while (!smb_find_next(&fi, &di)) {
-		if (di.attributes & FILE_ATTRIBUTE_DIRECTORY && opt_dirsize) {
+		if (di.directory && opt_dirsize) {
 			char *pt;
 			asprintf(&pt, "%s/%s", path, di.name);
 			smb_calc_size(c, pt, &di);
@@ -312,7 +311,7 @@ int smb_list_node(smb_connect_p c) {
 
 int smb_list(smb_connect_p c, const char *path, smb_dirinfo_p di) {	
 	if (path) {
-		if (di->attributes & FILE_ATTRIBUTE_DIRECTORY) {
+		if (di->directory) {
 			smb_log_normal("%s:\n", di->name);
 			smb_list_dir(c, path);
 			smb_log_normal("\n");
@@ -342,7 +341,7 @@ int smb_download(smb_connect_p c, const char *path, smb_dirinfo_p di) {
 	
 	smb_print_file(di);
 	
-	if (di->attributes & FILE_ATTRIBUTE_DIRECTORY) {
+	if (di->directory) {
 		smb_download_dir(c, path, dst);
 	} else {
 		smb_download_file(c, di, path, dst);
@@ -385,8 +384,8 @@ int smb_action(int action, smb_uri_p uri) {
 			}
 			smb_find_close(&fi);
 		} else {
-			ZERO_STRUCT(di);
-			di.attributes = FILE_ATTRIBUTE_DIRECTORY;
+			memset(&di, 0, sizeof(di));
+			di.directory = 1;
 			strncpy(di.name, uri->tree, sizeof(di.name));
 			switch (action) {
 				case 'd':
