@@ -1,10 +1,11 @@
 #include "includes.h"
 
-const char *human_file_size(long long int size) {
-	static char buf[64];
+const char *smb_hsize(uint64_t size, char *buf) {
+	static char sbuf[64];	
 	double s = size;
 	static const double t = 1000.0;
 	static const double p = 1024.0;
+	if (!buf) buf = sbuf;
 	if (s > t*p*p*p) {
 		sprintf(buf, "%.1ft", s / (p*p*p*p));
 	} else if (s > t*p*p) {
@@ -19,7 +20,7 @@ const char *human_file_size(long long int size) {
 	return buf;
 }
 
-long long int from_human_file_size(const char *s) {
+uint64_t smb_decode_hsize(const char *s) {
 	long long int x;
 	char *p;
 	x = strtol(s, &p, 10);
@@ -43,7 +44,7 @@ long long int from_human_file_size(const char *s) {
 	return x;
 }
 
-const char *human_time(int time) {
+const char *smb_htime(time_t time) {
 	static char buf[64];
 	int d, h, m, s;
 	d = time / 86400;

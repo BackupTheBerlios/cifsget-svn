@@ -5,12 +5,12 @@
 
 typedef struct smb_connect_s {
 	int sock;
+	char *name;
 	
 	/* I/O buffers*/
 	char *i, *o;
 	/* I/O buffers ends */
-	char *i_end, *o_end;
-	
+	char *i_end, *o_end;	
 	/* async I/O routine*/
 	int i_size, i_len, i_done;
 	int o_size, o_len, o_done;
@@ -19,10 +19,17 @@ typedef struct smb_connect_s {
 	int max_buffer_size;
 	int max_raw_size;
 	int capabilities;
-	int server_time_zone;
+	
 	int connected;
+
+	time_t time;
+	int zone;	
 } smb_connect_t;
 typedef smb_connect_t *smb_connect_p;
+
+int smb_packet_fail(char *packet);
+
+int smb_packet_error(char *packet);
 
 int smb_resolve(const char *host, struct in_addr *addr);
 
@@ -44,3 +51,4 @@ size_t smb_recv_raw(smb_connect_p c, void *buf, size_t len);
 int smb_request(smb_connect_p c);
 
 #endif /* TRANSPORT_H */
+

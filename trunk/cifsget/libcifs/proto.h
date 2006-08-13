@@ -1,8 +1,7 @@
 #ifndef PROTO_H
 #define PROTO_H
 
-time_t smb_nttime2unix(int64_t nttime);
-char *smb_nttime2unix_str(int64_t nttime);
+time_t smb_time(int64_t nttime);
 
 void smb_path_fix_oem (char *path);
 void smb_path_fix_ucs (char *path);
@@ -10,9 +9,9 @@ void smb_path_fix_ucs (char *path);
 int smb_negotiate(smb_connect_p c);
 int smb_sessionsetup(smb_connect_p c);
 
-int smb_tree_connect(smb_connect_p c, const char *server, const char *share);
-int smb_tree_switch(smb_connect_p c, int tid);
+int smb_tree_connect(smb_connect_p c, const char *tree);
 int smb_tree_disconnect(smb_connect_p c, int tid);
+int smb_tree_switch(smb_connect_p c, int tid);
 
 smb_connect_p smb_connect(const char *host,  int port, const char *name);
 smb_connect_p smb_connect_tree(const char *host, int port, const char *name, const char *tree);

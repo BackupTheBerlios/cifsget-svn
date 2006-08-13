@@ -1,5 +1,7 @@
 #include "includes.h"
 
+#include "doserr.h"
+
 #ifdef WINDOWS
 #ifndef MSG_WAITALL
 #define MSG_WAITALL 0
@@ -14,6 +16,47 @@ static int smb_check_packet(char *p, int size) {
 	if (size < OFF_PACKET_BC(p) + LEN_PACKET_BC(p)) return -1;
 	if (size < LEN_PACKET(p)) return -1;
 	return 0;
+}
+
+int smb_packet_fail(char *packet) {
+	return GET_PACKET_ERROR_CODE(packet);
+}
+
+int smb_packet_error(char *packet) {
+	switch (GET_PACKET_ERROR_CLASS(packet)) {
+		case 0:
+			return 0;
+		case ERRDOS:
+			switch (GET_PACKET_ERROR_CODE(packet)) {
+				case ERRsuccess:
+					return 0;
+				case ERRbadfile:
+				case ERRbadpath:
+				case ERRnosuchshare:
+					return ENOENT;
+				case ERRnofids:
+					return EMFILE;
+				case ERRnoaccess:
+				case ERRbadaccess:
+				case ERRlogonfailure:
+					return EACCES;
+				case ERRbadfid:
+					return EBADF;
+			}
+		break;
+		case ERRSRV:
+			switch (GET_PACKET_ERROR_CODE(packet)) {
+				case 0:
+					return 0;
+				case ERRerror:
+					return EIO;
+				case ERRbadpw:
+				case ERRaccess:
+					return EACCES;
+			}
+		break;
+	}
+	return EIO;
 }
 
 char *smb_nbt_name(char *buf, const char *name) {
@@ -120,6 +163,7 @@ int smb_connect_raw(smb_connect_p conn, const struct in_addr *address, int port 
 	conn->o_size = SMB_MAX_BUFFER + 4;
 	if (!conn->o) conn->o = malloc(conn->o_size);
 	conn->o_end = conn->o + conn->o_size;
+	conn->name = strdup(name);
 	return 0;
 }
 
@@ -180,7 +224,7 @@ int smb_send(smb_connect_p c) {
 	len = LEN_PACKET(c->o);
 	SET_PACKET_LENGTH(c->o, len - 4);
 
-	smb_log_packet("send", c->o);
+	smb_log_packet(c->o);
 
 	p = c->o;
 	while (len) {
@@ -336,7 +380,7 @@ int smb_recv(smb_connect_p c) {
 	}
 	
 
-	smb_log_packet("recv", c->i);
+	smb_log_packet(c->i);
 
 	return 0;
 }
@@ -352,8 +396,8 @@ int smb_request(smb_connect_p c) {
 	if (GET_PACKET_COMMAND(c->i) != GET_PACKET_COMMAND(c->o)) {
 
 		smb_log_error("sync error %d %d\n", GET_PACKET_COMMAND(c->i), GET_PACKET_COMMAND(c->o));
-		smb_log_packet("i", c->i);
-		smb_log_packet("o", c->o);
+		smb_log_packet(c->i);
+		smb_log_packet(c->o);
 
 
 		smb_shutdown(c);
@@ -361,8 +405,8 @@ int smb_request(smb_connect_p c) {
 		errno = EIO;
 		return -1;
 	}
-	if (GET_PACKET_STATUS(c->i)) {
-		errno = EIO;
+	if (smb_packet_fail(c->i)) {
+		errno = smb_packet_error(c->i);
 		return -1;
 	}
 	return 0;

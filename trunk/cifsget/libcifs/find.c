@@ -94,7 +94,6 @@ int smb_find_first(smb_connect_p c, const char *mask, smb_find_p f) {
 	
 	if (smb_trans_request(c, &f->t)) {
 		smb_trans_free(&f->t);
-		errno = ENOENT;
 		return -1;
 	}
 
@@ -117,7 +116,6 @@ loop:
 		
 		if (smb_send(f->c)) return -1;
 		if (smb_trans_recv(f->c, &f->t)) return -1;
-
 
 		smb_log_trans("findnext", &f->t);
 		smb_log_struct(f->t.param, IFINDNEXT);
@@ -144,68 +142,33 @@ int smb_find_close(smb_find_p f) {
 	return 0;
 }
 
+smb_dirinfo_p smb_info(smb_connect_p c, const char *name) {
+	smb_trans_t tr;
+	smb_dirinfo_p di;
 
-smb_find_p smb_find_first2(smb_connect_p c, const char *mask) {
-	smb_find_p f;
-	NEW_STRUCT(f);
-	if (smb_find_first(c, mask, f)) {
-		FREE_STRUCT(f);
-		return NULL;
-	}
-	return f;
-}
-
-smb_dirinfo_p smb_find_next2(smb_find_p f) {
-	smb_dirinfo_p d;
-	NEW_STRUCT(d);
-	if (smb_find_next(f, d)) {
-		FREE_STRUCT(d);
-		return NULL;
-	}
-	return d;
-}
-
-int smb_find_close2(smb_find_p f) {
-	smb_find_close(f);
-	FREE_STRUCT(f);
-	return 0;
-}
-
-
-int smb_info(smb_connect_p c, const char *name, smb_dirinfo_p d) {
-	smb_trans_t t;
 	smb_find_first_req(c, name);
-	if (smb_trans_alloc(&t)) return -1;
-	if (smb_trans_request(c, &t)) {
-		smb_trans_free(&t);
-		return -1;	
+	if (smb_trans_alloc(&tr)) return NULL;
+	if (smb_trans_request(c, &tr)) {
+		smb_trans_free(&tr);
+		return NULL;	
 	}	
 
-	smb_log_trans("info", &t);
-	smb_log_struct(t.param, IFINDFIRST);
+	smb_log_trans("info", &tr);
+	smb_log_struct(tr.param, IFINDFIRST);
 
-	if (GET_IFINDFIRST_SEARCH_COUNT(t.param) != 1) {
-		smb_trans_free(&t);
-		if (!GET_IFINDFIRST_END_OF_SEARCH(t.param)) {
-			smb_find_close_req(c, GET_IFINDFIRST_SID(t.param));
+	if (GET_IFINDFIRST_SEARCH_COUNT(tr.param) != 1) {
+		smb_trans_free(&tr);
+		if (!GET_IFINDFIRST_END_OF_SEARCH(tr.param)) {
+			smb_find_close_req(c, GET_IFINDFIRST_SID(tr.param));
 			smb_request(c);
 		}
 		errno = EMLINK;
-		return -1;
-	}
-	
-	smb_build_dirinfo(c, d, t.data);
-	smb_trans_free(&t);
-	return 0;
-}
-
-smb_dirinfo_p smb_info2(smb_connect_p c, const char *name) {
-	smb_dirinfo_p d;
-	NEW_STRUCT(d);
-	if (smb_info(c, name, d)) {
-		FREE_STRUCT(d);
 		return NULL;
 	}
-	return d;
+	
+	NEW_STRUCT(di);
+	smb_build_dirinfo(c, di, tr.data);
+	smb_trans_free(&tr);
+	return di;
 }
 

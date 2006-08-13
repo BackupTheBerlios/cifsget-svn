@@ -39,10 +39,10 @@
 #include <sys/time.h>
 #include <time.h>
 
-
-#include "byteorder.h"
+//defines from samba
 #include "smb.h"
 #include "trans2.h"
+#include "byteorder.h"
 
 #include "atom.h"
 #include "struct.h"
@@ -55,9 +55,6 @@
 
 #include "debug.h"
 #include "codepage.h"
-//#include "flow.h"
-//#include "mirror.h"
-//#include "human.h"
 
 #endif /* LIBCIFS_INCLUDES_H */
 

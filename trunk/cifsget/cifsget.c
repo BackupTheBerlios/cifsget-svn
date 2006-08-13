@@ -11,6 +11,7 @@ usage: cifsget OPTION | URI | UNC | SHORT ...\n\
   \n\
   OPTION:\n\
   -l                    list directory contents\n\
+  -S					calculate size\n\
   -o file		output file\n\
   -O dir		output directory\n\
   -s <int>[k|m|g|t]     limit download speed\n\
@@ -27,12 +28,8 @@ void smb_print_file(smb_dirinfo_p di) {
 	if (di->attributes & FILE_ATTRIBUTE_DIRECTORY) {
 		smb_log_normal(" <dir> %s/\n", di->name);
 	} else {
-		smb_log_normal("%6s %s\n", human_file_size(di->file_size), di->name);
+		smb_log_normal("%6s %s\n", smb_hsize(di->file_size, NULL), di->name);
 	}
-}
-
-smb_connect_p smb_connect_uri(smb_uri_p uri) {
-	return smb_connect_tree(uri->addr, uri->port, uri->name, uri->tree);
 }
 
 int smb_print_node(smb_node_p n) {
@@ -53,6 +50,20 @@ int smb_print_node(smb_node_p n) {
 	}
 	smb_log_normal(" %s %s\t%s\n", type, n->name, n->comment);
 	return 0;
+}
+
+int smb_print_status(const char *fmt, ...) {
+	static int len = 0;
+	int res;
+	va_list ap;
+	va_start(ap, fmt);
+	res = vprintf(fmt, ap);
+	va_end(ap);
+	while (len-- > res) putchar(' ');
+	putchar('\r');
+	fflush(stdout);
+	len = res;
+	return res;
 }
 
 int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const char *dst) {
@@ -87,7 +98,10 @@ int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const 
 
 	rem = di->file_size - off;
 
-	int ll = 0;
+	char size_str[10];
+
+	smb_hsize(di->file_size, size_str);
+
 	while (rem > 0) {
 		len  = (rem < sizeof(buf))?rem:sizeof(buf);
 		res = smb_read(c, fid, buf, len, off);
@@ -103,24 +117,19 @@ int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const 
 				goto err;
 			}
 		}
-		if (smb_log_level >= SMB_LOG_NORMAL && smb_flow(flow, res)) {
-			ll = 0;
-			ll += smb_log_msg("%6s of ", human_file_size(off));
-			ll += smb_log_msg("%6s ", human_file_size(di->file_size));
-			ll += smb_log_msg("(%.1f%%) ", (double)off * 100.0 / di->file_size);
-			ll += smb_log_msg("%6s/s ", human_file_size(flow->speed));
-			if (flow->speed > 0) {
-				ll += smb_log_msg("ETA: %s ", human_time((di->file_size - off) / flow->speed));
-			}
-			smb_log_msg("\r");
-			smb_log_flush();
+		if (smb_flow(flow, res) && smb_log_level >= SMB_LOG_NORMAL) {
+			char speed_str[10];
+			smb_print_status("%6s of %6s (%.1f%%) %6s/s ETA: %s ", 
+					smb_hsize(off, NULL), 
+					size_str,
+					(double)off * 100.0 / di->file_size, 
+					smb_hsize(flow->speed, speed_str), 
+					flow->speed > 0 ? smb_htime(rem / flow->speed) : "???");
 		}
 	}
 	if (smb_log_level >= SMB_LOG_NORMAL) {
-		while (ll--) smb_log_msg(" ");
-		smb_log_msg("\r");
-		smb_log_flush();
-	}	
+		smb_print_status("");
+	}
 	close(fd);
 	smb_close(c, fid);
 	return 0;
@@ -134,7 +143,7 @@ err:
 int smb_download_dir(smb_connect_p c, const char *src, const char *dst) {
 	char *mask = NULL, *sname, *dname;
 	smb_dirinfo_t di;
-	smb_find_p f;	
+	smb_find_t fi;
 
 	if (!smb_connected(c)) {
 		errno = ENOTCONN;
@@ -144,17 +153,15 @@ int smb_download_dir(smb_connect_p c, const char *src, const char *dst) {
 	if (mkdir(dst, 0755) && errno != EEXIST) {
 		perror(dst);
 		goto err;
-	}
-	
+	}	
 	asprintf(&mask, "%s/*", src);
-	f = smb_find_first2(c, mask);
-	if (!f) {
+	
+	if (smb_find_first(c, mask, &fi)) {
 		perror(src);
-		free(mask);
 		return -1;
 	}
-
-	while (!smb_find_next(f, &di)) {
+	
+	while (!smb_find_next(&fi, &di)) {
 		asprintf(&sname, "%s/%s", src, di.name);
 		asprintf(&dname, "%s/%s", dst, di.name);
 		
@@ -174,17 +181,17 @@ int smb_download_dir(smb_connect_p c, const char *src, const char *dst) {
 				if (!smb_connected(c)) {
 					errno = ENOTCONN;
 					goto err;
-				}				
+				}
 			}
 		}
 		free(sname);
 		free(dname);
-	}	
-	smb_find_close2(f);
+	}
+	smb_find_close(&fi);
 	free(mask);
 	return 0;
-err:	
-	smb_find_close2(f);
+err:
+	smb_find_close(&fi);
 	free(mask);
 	return -1;
 }
@@ -192,181 +199,247 @@ err:
 int smb_list_dir(smb_connect_p c, const char *path) {
 	char *mask;
 	smb_dirinfo_t di;
-	smb_find_p f;
+	smb_find_t fi;
 	uint64_t total = 0;
 	asprintf(&mask, "%s/*", path);
-	f = smb_find_first2(c, mask);
-	if (!f) {
-		free(mask);
+	if (smb_find_first(c, mask, &fi)) {
+		perror(path);
 		return -1;
 	}
-	while (!smb_find_next(f, &di)) {
+	while (!smb_find_next(&fi, &di)) {
 		smb_print_file(&di);
 		if (!(di.attributes & FILE_ATTRIBUTE_DIRECTORY)) {
 			total += di.file_size;
 		}
 	}
-	smb_log_normal("total: %s\n", human_file_size(total));
-	smb_find_close2(f);
-	free(mask);	
+	smb_find_close(&fi);
+	smb_log_normal("total: %s\n", smb_hsize(total, NULL));
+	free(mask);
 	return 0;
 }
 
-int smb_list_node(smb_uri_p uri) {
-	smb_connect_p c;
+int smb_list_node(smb_connect_p c) {
 	smb_node_enum_t e;
 	smb_node_t n;
-	
-	int dc, i;
-	char **dom;
-	c = smb_connect_tree(uri->addr, uri->port, uri->name, "IPC$");
-	
+
 	if (!c) return -1;
+
+	if (smb_tree_connect(c, "IPC$")) {
+		perror("ipc");
+		return -1;
+	}
 	
-	if (!smb_domain_enum(c, &e)) {		
-		dc = e.count;
-		i=0;
-		dom = calloc(dc, sizeof(char*));
+	if (!smb_domain_enum(c, &e)) {
+		char **dom = calloc(e.count+1, sizeof(char*));
+		char **p = dom;
+		
 		while (!smb_node_next(c, &e, &n)) {
 			smb_print_node(&n);
-			dom[i++] = strdup(n.name);
+			*p++ = strdup(n.name);
 		}
 		
 		smb_log_normal("\n");
 		
-		for (i = 0 ; i < dc ; i++) {			
-			if (!smb_server_enum(c, &e, dom[i])) {
-				smb_log_normal("%s:\n", dom[i]);
+		for (p = dom ; *p ; p++) {
+			if (!smb_server_enum(c, &e, *p)) {
+				smb_log_normal("%s:\n", *p);
 				while (!smb_node_next(c, &e, &n)) {
 					smb_print_node(&n);
 				}
 				smb_log_normal("\n");
-			}			
-		}		
+			}
+			free(*p);
+		}
+		free(dom);
 	}
+	
 	if (!smb_share_enum(c, &e)) {
 		while (!smb_node_next(c, &e, &n)) {
 			smb_print_node(&n);
 		}
 	}
-	smb_disconnect(c);
+	
+	smb_tree_disconnect(c, 0);
 	return 0;
 }
 
-int smb_ls(smb_uri_p uri) {
-	smb_connect_p c;
-	smb_dirinfo_t di;
-	smb_find_p f;
-	
-	if (uri->tree) {
-		c = smb_connect_uri(uri);
-		if (!c) return -1;
-		if (uri->file) {
-			f = smb_find_first2(c, uri->path);
-			if (!f) {
-				perror(uri->path);
-				return -1;
-			}
-			while (!smb_find_next(f, &di)) {
-				if (di.attributes & FILE_ATTRIBUTE_DIRECTORY) {
-					char *dir;
-					smb_log_normal("%s:\n", di.name);
-					asprintf(&dir, "%s/%s", uri->dir, di.name);
-					smb_list_dir(c, dir);
-					free(dir);
-					smb_log_normal("\n");
-				} else {
-					smb_print_file(&di);
-				}
-			}
-			smb_find_close2(f);
+int smb_list(smb_connect_p c, const char *path, smb_dirinfo_p di) {	
+	if (path) {
+		if (di->attributes & FILE_ATTRIBUTE_DIRECTORY) {
+			smb_log_normal("%s:\n", di->name);
+			smb_list_dir(c, path);
+			smb_log_normal("\n");
 		} else {
-			smb_list_dir(c, "");
+			smb_print_file(di);
 		}
 	} else {
-		smb_list_node(uri);
+		smb_list_node(c);
 	}
-	
 	return 0;
 }
-
 
 char *outfile = NULL, *outdir = ".";
 
-int smb_get(smb_uri_p uri) {
-	smb_connect_p c;
-	smb_dirinfo_t di;
-	smb_find_p f;
-	
-	c = smb_connect_uri(uri);
-	if (!c) return -1;
-	
-	if (uri->file) {
-		f = smb_find_first2(c, uri->path);
-		if (!f) {
-			perror(uri->path);
-			smb_disconnect(c);
-			return -1;
-		}
-		while (!smb_find_next(f, &di)) {
-			char *src, *dst;
-			asprintf(&src, "%s/%s", uri->dir, di.name);
+int smb_download(smb_connect_p c, const char *path, smb_dirinfo_p di) {
+	char *dst;
 			
-			if (!outfile) {
-				asprintf(&dst, "%s/%s", outdir, di.name);
-			} else {
-				if (outfile[0] == '/') {
-					dst = outfile;
-				} else {
-					asprintf(&dst, "%s/%s", outdir, outfile);
-				}
-			}
-			
-			smb_print_file(&di);
-			
-			if (di.attributes & FILE_ATTRIBUTE_DIRECTORY) {
-				smb_download_dir(c, src, dst);
-			} else {
-				smb_download_file(c, &di, src, dst);
-			}
-			
-			free(src);
-			free(dst);
-			outfile = NULL;
-		}
-		smb_find_close2(f);
+	if (!outfile) {
+		asprintf(&dst, "%s/%s", outdir, di->name);
 	} else {
-		if (outfile) {
-			smb_download_dir(c, "", outfile);
+		if (outfile[0] == '/') {
+			dst = strdup(outfile);
 		} else {
-			smb_download_dir(c, "", uri->tree);
+			asprintf(&dst, "%s/%s", outdir, outfile);
 		}
 	}
-	smb_disconnect(c);
+	
+	smb_print_file(di);
+	
+	if (di->attributes & FILE_ATTRIBUTE_DIRECTORY) {
+		smb_download_dir(c, path, dst);
+	} else {
+		smb_download_file(c, di, path, dst);
+	}		
+
+	free(dst);
+	free(outfile);
+	outfile = NULL;
 	return 0;
 }
 
-int main(int argc, char * const argv[]) {
+int smb_get_size_dir(smb_connect_p c, const char *path, const char *name, uint64_t *size) {
+	smb_find_t fi;
+	smb_dirinfo_t di;
+	char *mask;
+	
+	
+	smb_print_status("%6s %s", smb_hsize(*size, NULL), name);
+	
+	asprintf(&mask, "%s/*", path);
+	if (smb_find_first(c, mask, &fi)) {
+		free(mask);
+		return -1;
+	}
+	free(mask);	
+	
+	while (!smb_find_next(&fi, &di)) {
+		if (di.attributes & FILE_ATTRIBUTE_DIRECTORY) {
+			char *pt, *nm;
+			asprintf(&pt, "%s/%s", path, di.name);
+			asprintf(&nm, "%s/%s", name, di.name);
+			smb_get_size_dir(c, pt, nm, size);
+			free(pt);
+			free(nm);
+		} else {
+			*size += di.file_size;
+		}
+	}
+	
+	smb_find_close(&fi);
+	
+	return 0;
+}
+
+uint64_t smb_calc_size(smb_connect_p c, const char *path, smb_dirinfo_p di) {
+	uint64_t size = 0;
+	if (!c) return 0;
+	if (di->attributes & FILE_ATTRIBUTE_DIRECTORY) {
+		smb_get_size_dir(c, path,  di->name, &size);
+		smb_print_status("");
+	} else {
+		size += di->file_size;
+	}
+	smb_log_msg("%6s %s\n", smb_hsize(size, NULL), di->name);
+	return size;
+}
+
+int smb_action(int action, smb_uri_p uri) {
+	smb_connect_p c;
+	smb_find_t fi;
+	smb_dirinfo_t di;
+	if (uri->tree) {
+		c = smb_connect_tree(uri->addr, uri->port, uri->name, uri->tree);
+		if (!c) {
+			perror(uri->tree);
+			return -1;
+		}
+		if (uri->path && uri->path[0]) {
+			if (!c) return -1;
+			if (smb_find_first(c, uri->path, &fi)) {
+				perror(uri->path);
+				smb_disconnect(c);
+				return -1;
+			}
+			while (!smb_find_next(&fi, &di)) {
+				char *path;
+				asprintf(&path, "%s/%s", uri->dir, di.name);
+				switch (action) {
+					case 'd':
+						smb_download(c, path, &di);
+						break;
+					case 'l':
+						smb_list(c, path, &di);
+						break;
+					case 'S':
+						smb_calc_size(c, path, &di);
+						break;		
+				}
+			}
+			smb_find_close(&fi);
+		} else {
+			ZERO_STRUCT(di);
+			di.attributes = FILE_ATTRIBUTE_DIRECTORY;
+			strncpy(di.name, uri->tree, sizeof(di.name));
+			switch (action) {
+				case 'd':
+					smb_download(c, "", &di);
+					break;
+				case 'l':
+					smb_list(c, "", &di);
+					break;
+				case 'S':
+					smb_calc_size(c, "", &di);
+					break;
+			}
+		}
+	} else {
+		c = smb_connect(uri->addr, uri->port, uri->name);
+		if (!c) {
+			perror(uri->name);
+			return -1;
+		}
+		switch (action) {
+			case 'l':
+				smb_list(c, NULL, NULL);
+				break;
+		}
+	}
+	smb_disconnect(c);
+	
+	return 0;
+}
+
+int main(int argc, char** argv) {
+	int opt;
+	smb_uri_p uri;
+	int action = 'd';
+	
 	if (argc == 1) {
 		usage();
 		return 0;
 	}
-	flow = smb_flow_new();
+	flow = smb_flow_new();	
 
-	smb_uri_p uri;
-	int list = 0;
-	int opt;
-
-	NEW_STRUCT(uri);	
+	NEW_STRUCT(uri);
 	
 	do {
-		opt = getopt(argc, argv, "-ls:o:O:d:i:p:h");
+		opt = getopt(argc, argv, "-ls:o:O:d:i:p:hS");
 		switch (opt) {
 			case 'd':
 				smb_log_level = atoi(optarg);
 				break;
 			case 's':			
-				flow->limit = from_human_file_size(optarg);
+				flow->limit = smb_decode_hsize(optarg);
 				break;
 			case 'O':
 				outdir = optarg;
@@ -375,7 +448,10 @@ int main(int argc, char * const argv[]) {
 				outfile = strdup(optarg);
 				break;
 			case 'l':
-				list = 1;
+				action = 'l';
+				break;
+			case 'S':
+				action = 'S';
 				break;
 			case 'i':
 				free(uri->addr);
@@ -387,14 +463,12 @@ int main(int argc, char * const argv[]) {
 			case -1:
 			case 1:
 				if (uri->name) {
-					if (list) {
-						smb_ls(uri);
-						list = 0;
-					} else
-						smb_get(uri);
+					smb_action(action, uri);
 					smb_uri_free(uri);
 				}
-				if (optarg) smb_uri_parse(uri, optarg);
+				if (optarg) {
+					smb_uri_parse(uri, optarg);
+				}
 				break;
 			case '?':
 			case 'h':

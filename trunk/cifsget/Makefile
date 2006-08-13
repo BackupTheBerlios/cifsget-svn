@@ -1,5 +1,5 @@
 CFLAGS=-g -std=c99 -Wall
-OBJECTS=flow.o mirror.o human.o uri.o libcifs/libcifs.a
+OBJECTS=flow.o human.o uri.o libcifs/libcifs.a
 PREFIX=${HOME}
 
 all: libs cifsget
@@ -8,7 +8,7 @@ libs:
 	make -C libcifs
 
 install: all
-	cp cifsget ${PREFIX}/bin/
+	install cifsget ${PREFIX}/bin/
 
 .c.o:
 	${CC} ${CFLAGS} -c -o $@ $<

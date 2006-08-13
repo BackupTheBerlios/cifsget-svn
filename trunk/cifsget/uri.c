@@ -26,8 +26,6 @@ char *smb_uri_unescape(char *s) {
 	return s;
 }
 
-#define stredup(s,e) 	strndup(s, e-s)
-
 // smb://[login[:password]@]host[:port][/share(/name)*]
 
 /*int smb_parse_dest(char *s, smb_uri_p uri) {
@@ -69,51 +67,46 @@ char *smb_uri_unescape(char *s) {
 	return 0;
 }*/
 
+#define SKIP_SLASH(p) while (*p && (*p == '/' || *p == '\\')) p++
+#define NEXT_SLASH(p) while (*p && *p != '/' && *p != '\\') p++
+
 int smb_uri_parse(smb_uri_p uri, const char *str) {
-	char *p, *n, *d, *s;
-	int i = 0;
+	char *o, *s, *a, *b;
 
 	s = strdup(str);
 	smb_uri_unescape(s);
 
-	p = strstr(s, "://");
-	if (p) {
-		if (!uri->scheme) uri->scheme = stredup(s, p);
-		p += 3;		
+	a = strstr(s, "://");
+	if (a) {
+		if (!uri->scheme) uri->scheme = strndup(s, a - s);
+		a += 3;
 	} else {
-		p = s;
+		a = s;
 	}
-
-	d = uri->path = malloc(strlen(p)+1);
-
-	while (*p && (*p == '/' || *p == '\\')) p++;
 	
-	while (*p) {
-		n = p;
-		while (*n && *n != '/' && *n != '\\') n++;
+	o = uri->path = malloc(strlen(a) + 2);
+	for (int i = 0 ; (b = strsep(&a, "/\\")) ; ) {
+		if (!b[0]) continue;		
 		switch (i) {
 			case 0:
-				//if (smb_parse_dest(p, uri)) return -1;
-				if (!uri->name) uri->name = stredup(p, n);
-				if (!uri->addr) uri->addr = strdup(uri->name);
+				if (!uri->name) uri->name = strdup(b);
+				if (!uri->addr) uri->addr = strdup(b);
 				break;
 			case 1:
-				if (!uri->tree) uri->tree = stredup(p, n);
+				if (!uri->tree) uri->tree = strdup(b);
 				break;
 			default:
-				*d++ = '\\';
-				while (p<n) *d++ = *p++;
+				strcat(strcat(o, "/"), b);
 				break;
 		}
-		p = n;
-		while (*p && (*p == '/' || *p == '\\')) p++;
 		i++;
 	}
-	*d = '\0';
-	p = strrchr(uri->path, '\\');
-	if (p) {
-		if (!uri->file) uri->file = strdup(p+1);
-		if (!uri->dir) uri->dir = stredup(uri->path, p);
+	a = strrchr(uri->path, '/');
+	if (a) {
+		if (!uri->file) uri->file = strdup(a+1);
+		if (!uri->dir) uri->dir = strndup(uri->path, a - uri->path);
+	} else {
+		uri->dir = strdup("");
 	}
 	free(s);
 	return 0;

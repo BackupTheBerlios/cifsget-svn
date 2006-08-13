@@ -25,11 +25,21 @@
 #define LEN_PACKET_COMMAND(base) 1
 #define GET_PACKET_COMMAND(base) GET_BYTE(base, OFF_PACKET_COMMAND(base))
 #define SET_PACKET_COMMAND(base, val) SET_BYTE(base, OFF_PACKET_COMMAND(base), val)
-#define OFF_PACKET_STATUS(base) 9
-#define PTR_PACKET_STATUS(base) (base + OFF_PACKET_STATUS(base))
-#define LEN_PACKET_STATUS(base) 4
-#define GET_PACKET_STATUS(base) GET_LONG(base, OFF_PACKET_STATUS(base))
-#define SET_PACKET_STATUS(base, val) SET_LONG(base, OFF_PACKET_STATUS(base), val)
+#define OFF_PACKET_ERROR_CLASS(base) 9
+#define PTR_PACKET_ERROR_CLASS(base) (base + OFF_PACKET_ERROR_CLASS(base))
+#define LEN_PACKET_ERROR_CLASS(base) 1
+#define GET_PACKET_ERROR_CLASS(base) GET_BYTE(base, OFF_PACKET_ERROR_CLASS(base))
+#define SET_PACKET_ERROR_CLASS(base, val) SET_BYTE(base, OFF_PACKET_ERROR_CLASS(base), val)
+#define OFF_PACKET_RESERVED(base) 10
+#define PTR_PACKET_RESERVED(base) (base + OFF_PACKET_RESERVED(base))
+#define LEN_PACKET_RESERVED(base) 1
+#define GET_PACKET_RESERVED(base) GET_BYTE(base, OFF_PACKET_RESERVED(base))
+#define SET_PACKET_RESERVED(base, val) SET_BYTE(base, OFF_PACKET_RESERVED(base), val)
+#define OFF_PACKET_ERROR_CODE(base) 11
+#define PTR_PACKET_ERROR_CODE(base) (base + OFF_PACKET_ERROR_CODE(base))
+#define LEN_PACKET_ERROR_CODE(base) 2
+#define GET_PACKET_ERROR_CODE(base) GET_WORD(base, OFF_PACKET_ERROR_CODE(base))
+#define SET_PACKET_ERROR_CODE(base, val) SET_WORD(base, OFF_PACKET_ERROR_CODE(base), val)
 #define OFF_PACKET_FLAGS(base) 13
 #define PTR_PACKET_FLAGS(base) (base + OFF_PACKET_FLAGS(base))
 #define LEN_PACKET_FLAGS(base) 1
@@ -101,7 +111,9 @@ macro(zero, BYTE, GET_PACKET_ZERO(base), LEN_PACKET_ZERO(base));\
 macro(length, BE_WORD, GET_PACKET_LENGTH(base), LEN_PACKET_LENGTH(base));\
 macro(magic, BE_LONG, GET_PACKET_MAGIC(base), LEN_PACKET_MAGIC(base));\
 macro(command, BYTE, GET_PACKET_COMMAND(base), LEN_PACKET_COMMAND(base));\
-macro(status, LONG, GET_PACKET_STATUS(base), LEN_PACKET_STATUS(base));\
+macro(error_class, BYTE, GET_PACKET_ERROR_CLASS(base), LEN_PACKET_ERROR_CLASS(base));\
+macro(reserved, BYTE, GET_PACKET_RESERVED(base), LEN_PACKET_RESERVED(base));\
+macro(error_code, WORD, GET_PACKET_ERROR_CODE(base), LEN_PACKET_ERROR_CODE(base));\
 macro(flags, BYTE, GET_PACKET_FLAGS(base), LEN_PACKET_FLAGS(base));\
 macro(flags2, WORD, GET_PACKET_FLAGS2(base), LEN_PACKET_FLAGS2(base));\
 macro(pidh, WORD, GET_PACKET_PIDH(base), LEN_PACKET_PIDH(base));\
@@ -161,16 +173,16 @@ macro(b, BLOB, GET_PACKET_B(base), LEN_PACKET_B(base));\
 #define LEN_INEGOT_CAPABILITIES(base) 4
 #define GET_INEGOT_CAPABILITIES(base) GET_LONG(base, OFF_INEGOT_CAPABILITIES(base))
 #define SET_INEGOT_CAPABILITIES(base, val) SET_LONG(base, OFF_INEGOT_CAPABILITIES(base), val)
-#define OFF_INEGOT_SYSTEMTIME(base) 23
-#define PTR_INEGOT_SYSTEMTIME(base) (base + OFF_INEGOT_SYSTEMTIME(base))
-#define LEN_INEGOT_SYSTEMTIME(base) 8
-#define GET_INEGOT_SYSTEMTIME(base) GET_NT_TIME(base, OFF_INEGOT_SYSTEMTIME(base))
-#define SET_INEGOT_SYSTEMTIME(base, val) SET_NT_TIME(base, OFF_INEGOT_SYSTEMTIME(base), val)
-#define OFF_INEGOT_SERVERTIMEZONE(base) 31
-#define PTR_INEGOT_SERVERTIMEZONE(base) (base + OFF_INEGOT_SERVERTIMEZONE(base))
-#define LEN_INEGOT_SERVERTIMEZONE(base) 2
-#define GET_INEGOT_SERVERTIMEZONE(base) GET_SIGNED_WORD(base, OFF_INEGOT_SERVERTIMEZONE(base))
-#define SET_INEGOT_SERVERTIMEZONE(base, val) SET_SIGNED_WORD(base, OFF_INEGOT_SERVERTIMEZONE(base), val)
+#define OFF_INEGOT_TIME(base) 23
+#define PTR_INEGOT_TIME(base) (base + OFF_INEGOT_TIME(base))
+#define LEN_INEGOT_TIME(base) 8
+#define GET_INEGOT_TIME(base) GET_NT_TIME(base, OFF_INEGOT_TIME(base))
+#define SET_INEGOT_TIME(base, val) SET_NT_TIME(base, OFF_INEGOT_TIME(base), val)
+#define OFF_INEGOT_ZONE(base) 31
+#define PTR_INEGOT_ZONE(base) (base + OFF_INEGOT_ZONE(base))
+#define LEN_INEGOT_ZONE(base) 2
+#define GET_INEGOT_ZONE(base) GET_SIGNED_WORD(base, OFF_INEGOT_ZONE(base))
+#define SET_INEGOT_ZONE(base, val) SET_SIGNED_WORD(base, OFF_INEGOT_ZONE(base), val)
 #define OFF_INEGOT_ENCRYPTIONKEYLENGTH(base) 33
 #define PTR_INEGOT_ENCRYPTIONKEYLENGTH(base) (base + OFF_INEGOT_ENCRYPTIONKEYLENGTH(base))
 #define LEN_INEGOT_ENCRYPTIONKEYLENGTH(base) 1
@@ -187,8 +199,8 @@ macro(maxbuffersize, LONG, GET_INEGOT_MAXBUFFERSIZE(base), LEN_INEGOT_MAXBUFFERS
 macro(maxrawsize, LONG, GET_INEGOT_MAXRAWSIZE(base), LEN_INEGOT_MAXRAWSIZE(base));\
 macro(sessionkey, LONG, GET_INEGOT_SESSIONKEY(base), LEN_INEGOT_SESSIONKEY(base));\
 macro(capabilities, LONG, GET_INEGOT_CAPABILITIES(base), LEN_INEGOT_CAPABILITIES(base));\
-macro(systemtime, NT_TIME, GET_INEGOT_SYSTEMTIME(base), LEN_INEGOT_SYSTEMTIME(base));\
-macro(servertimezone, SIGNED_WORD, GET_INEGOT_SERVERTIMEZONE(base), LEN_INEGOT_SERVERTIMEZONE(base));\
+macro(time, NT_TIME, GET_INEGOT_TIME(base), LEN_INEGOT_TIME(base));\
+macro(zone, SIGNED_WORD, GET_INEGOT_ZONE(base), LEN_INEGOT_ZONE(base));\
 macro(encryptionkeylength, BYTE, GET_INEGOT_ENCRYPTIONKEYLENGTH(base), LEN_INEGOT_ENCRYPTIONKEYLENGTH(base));\
 } while(0)
 

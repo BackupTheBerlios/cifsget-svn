@@ -75,16 +75,16 @@ int smb_trans_recv(smb_connect_p c, smb_trans_p t) {
 				(GET_PACKET_COMMAND(c->i) != SMBtrans2)) {
 #ifdef	SMB_DUMP_FATAL
 			smb_log_msg("trans sync error %d %d\n", GET_PACKET_COMMAND(c->i), GET_PACKET_COMMAND(c->o));
-			smb_log_packet("i", c->i);
-			smb_log_packet("o", c->o);
+			smb_log_packet(c->i);
+			smb_log_packet(c->o);
 #endif
 			
 			errno = EIO;
 			return -1;
 		}
 
-		if (GET_PACKET_STATUS(c->i) != 0) {
-			errno = EIO;
+		if (smb_packet_fail(c->i)) {
+			errno = smb_packet_error(c->i);
 			return -1;
 		}
 
@@ -108,8 +108,8 @@ int smb_trans_recv(smb_connect_p c, smb_trans_p t) {
 		if (cnt <= t->param_total) {
 			t->param_total = cnt;
 		} else {
-
-			smb_log_packet("incorrect transaction", c->i);
+			smb_log_error("incorrect transaction\n");
+			smb_log_packet(c->i);
 			smb_log_struct(w, ITRANSS);
 
 			errno = EIO;
@@ -120,8 +120,8 @@ int smb_trans_recv(smb_connect_p c, smb_trans_p t) {
 		if (cnt <= t->data_total) {
 			t->data_total = cnt;
 		} else {
-
-			smb_log_packet("incorrect transaction", c->i);
+			smb_log_error("incorrect transaction\n");
+			smb_log_packet(c->i);
 			smb_log_struct(w, ITRANSS);
 
 			errno = EIO;
@@ -135,7 +135,8 @@ int smb_trans_recv(smb_connect_p c, smb_trans_p t) {
 			
 			if (dis + cnt > t->param_total || off + cnt > len) {
 
-				smb_log_packet("incorrect transaction", c->i);
+				smb_log_error("incorrect transaction\n");
+				smb_log_packet(c->i);
 				smb_log_struct(w, ITRANSS);
 
 				errno = EIO;
@@ -153,7 +154,8 @@ int smb_trans_recv(smb_connect_p c, smb_trans_p t) {
 			
 			if (dis + cnt > t->data_total || off + cnt > len) {
 
-				smb_log_packet("incorrect transaction", c->i);
+				smb_log_error("incorrect transaction\n");
+				smb_log_packet(c->i);
 				smb_log_struct(w, ITRANSS);
 
 				errno = EIO;

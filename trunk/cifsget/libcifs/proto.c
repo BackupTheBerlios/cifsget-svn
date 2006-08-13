@@ -1,12 +1,7 @@
 #include "includes.h"
 
-time_t smb_nttime2unix(int64_t nttime) {
+time_t smb_time(int64_t nttime) {
 	return (time_t)(((nttime)/10000000) - 11644473600);
-}
-
-char *smb_nttime2unix_str(int64_t nttime) {
-	time_t t = smb_nttime2unix(nttime);
-	return ctime(&t);
 }
 
 void smb_path_fix_oem (char *path) {
@@ -25,9 +20,13 @@ int smb_negotiate(smb_connect_p c) {
 
 	SET_PACKET_MAGIC(o, SMB_MAGIC);
 	SET_PACKET_COMMAND(o, SMBnegprot);
-	SET_PACKET_STATUS(o, 0);
-	SET_PACKET_FLAGS(o, FLAG_CANONICAL_PATHNAMES | FLAG_CASELESS_PATHNAMES );
-	SET_PACKET_FLAGS2(o, FLAGS2_LONG_PATH_COMPONENTS | FLAGS2_IS_LONG_NAME | FLAGS2_32_BIT_ERROR_CODES | FLAGS2_UNICODE_STRINGS);
+	
+	SET_PACKET_ERROR_CLASS(o, 0);
+	SET_PACKET_RESERVED(o, 0);
+	SET_PACKET_ERROR_CODE(o, 0);
+	
+	SET_PACKET_FLAGS(o, FLAG_CANONICAL_PATHNAMES | FLAG_CASELESS_PATHNAMES);
+	SET_PACKET_FLAGS2(o, FLAGS2_LONG_PATH_COMPONENTS | FLAGS2_IS_LONG_NAME);
 	SET_PACKET_PIDH(o, 0);
 	SET_PACKET_SIGNATURE(o, 0ll);
 	SET_PACKET_UNUSED(o, 0);
@@ -44,7 +43,7 @@ int smb_negotiate(smb_connect_p c) {
 	
 	if (smb_request(c)) return -1;
 	
-	p = GET_PACKET_W(c->i);	
+	p = GET_PACKET_W(c->i);
 	c->session_key = GET_INEGOT_SESSIONKEY(p);
 	
 	c->max_buffer_size = GET_INEGOT_MAXBUFFERSIZE(p);
@@ -54,8 +53,18 @@ int smb_negotiate(smb_connect_p c) {
 	if (c->max_raw_size > SMB_MAX_RAW) c->max_raw_size = SMB_MAX_RAW;
 	
 	c->capabilities = GET_INEGOT_CAPABILITIES(p);
-	c->server_time_zone = GET_INEGOT_SERVERTIMEZONE(p);
+
+	c->time = smb_time(GET_INEGOT_TIME(p));
+	c->zone = GET_INEGOT_ZONE(p) * 60;
+
+	smb_log_verbose("server zone: UTC %+d time: %s\n", c->zone/3600, ctime(&c->time));
+
+	//c->capabilities &= !CAP_UNICODE;
 	
+	if (c->capabilities & CAP_UNICODE) {
+		SET_PACKET_FLAGS2(o, GET_PACKET_FLAGS2(o) | FLAGS2_UNICODE_STRINGS);
+	}
+
 	smb_log_struct(p, INEGOT);
 
 	return 0;
@@ -77,12 +86,12 @@ int smb_sessionsetup(smb_connect_p c) {
 	SET_OSESSIONSETUP_IPWDLEN(p, 0);
 	SET_OSESSIONSETUP_PWDLEN(p, 0);
 	SET_OSESSIONSETUP_RESERVED(p, 0);
-	SET_OSESSIONSETUP_CAPABILITIES(p, c->capabilities & (CAP_STATUS32 | CAP_RAW_MODE | CAP_LARGE_FILES | CAP_UNICODE));
+	SET_OSESSIONSETUP_CAPABILITIES(p, c->capabilities & (CAP_RAW_MODE | CAP_LARGE_FILES | CAP_UNICODE));
 
 	smb_log_struct(p, OSESSIONSETUP);
 		
 	p = PTR_PACKET_B(o);
-	
+
 	if (c->capabilities & CAP_UNICODE) {
 		WRITE_ALIGN(p, c->o, 2);
 		WRITE_STRING_UCS(p, c->o_end, "GUEST");
@@ -108,7 +117,7 @@ int smb_sessionsetup(smb_connect_p c) {
 }
 
 
-int smb_tree_connect(smb_connect_p c, const char *server, const char *share) {
+int smb_tree_connect(smb_connect_p c, const char *tree) {
 	char *o=c->o, *p;
 	int tid;
 	
@@ -120,20 +129,23 @@ int smb_tree_connect(smb_connect_p c, const char *server, const char *share) {
 	SETLEN_PACKET_W(o, LEN_OTREECONNECT(p));
 	SET_OTREECONNECT_ANDX(p, 0xFF);
 	SET_OTREECONNECT_FLAGS(p, 0);
-	SET_OTREECONNECT_PWDLEN(p, 1);
+	SET_OTREECONNECT_PWDLEN(p, 0);
 
 
 	smb_log_struct(p, OTREECONNECT);
 
 	p = GET_PACKET_B(o);
-	WRITE_BYTE(p, 0);
 	if (c->capabilities & CAP_UNICODE) {
+		WRITE_ALIGN(p, c->o, 2);
 		WRITE_BUF_UCS(p, c->o_end, "\\\\");
-		WRITE_BUF_UCS(p, c->o_end, server);
+		WRITE_BUF_UCS(p, c->o_end, c->name);
 		WRITE_BUF_UCS(p, c->o_end, "\\");
-		WRITE_STRING_UCS(p, c->o_end, share);
+		WRITE_STRING_UCS(p, c->o_end, tree);
 	} else {
-		WRITE_FORMAT(p, "\\\\%s\\%s", server, share);
+		WRITE_BUF_OEM(p, c->o_end, "\\\\");
+		WRITE_BUF_OEM(p, c->o_end, c->name);
+		WRITE_BUF_OEM(p, c->o_end, "\\");
+		WRITE_STRING_OEM(p, c->o_end, tree);
 	}
 	WRITE_STRING(p, "?????");
 	END_PACKET_B(o, p);
@@ -148,7 +160,7 @@ int smb_tree_connect(smb_connect_p c, const char *server, const char *share) {
 	p = GET_PACKET_W(c->i);
 	smb_log_struct(p, ITREECONNECT);
 
-	return tid;
+	return 0;
 }
 
 int smb_tree_switch(smb_connect_p c, int tid) {
@@ -161,7 +173,7 @@ int smb_tree_switch(smb_connect_p c, int tid) {
 
 int smb_tree_disconnect(smb_connect_p c, int tid) {
 	char *o=c->o;
-
+	
 	if (tid >= 0) SET_PACKET_TID(o, tid);
 	
 	SET_PACKET_COMMAND(o, SMBtdis);
@@ -192,7 +204,7 @@ int smb_open(smb_connect_p c, const char *name, int mode) {
 		WRITE_ALIGN(p, c->o, 2);
 		char *tmp = p;
 		WRITE_STRING_UCS(p, c->o_end, name);
-		smb_path_fix_ucs(tmp);		
+		smb_path_fix_ucs(tmp);
 	} else {
 		char *tmp = p;
 		WRITE_STRING_OEM(p, c->o_end, name);
@@ -340,13 +352,9 @@ int smb_disconnect(smb_connect_p c) {
 smb_connect_p smb_connect(const char *host, int port, const char *name) {
 	smb_connect_p c;
 	struct in_addr address;
-	if (smb_resolve(host, &address)) {
-		smb_log_error("can not resolve \"%s\": %s\n", host, strerror(errno));
-		return NULL;
-	}
+	if (smb_resolve(host, &address)) return NULL;
 	NEW_STRUCT(c);
 	if  (smb_connect_raw(c, &address, port, name) || smb_negotiate(c) || smb_sessionsetup(c)) {
-		smb_log_error("connection to %s:%d (%s) failed: %s\n", host, port, name, strerror(errno));
 		smb_disconnect(c);
 		return NULL;
 	}
@@ -357,8 +365,7 @@ smb_connect_p smb_connect_tree(const char *host, int port, const char *name, con
 	smb_connect_p c;
 	c = smb_connect(host, port, name);
 	if (!c) return NULL;
-	if (smb_tree_connect(c, name, tree) < 0) {
-		smb_log_error("connection to \\\\%s\\%s failed: %s\n", name, tree, strerror(errno));
+	if (smb_tree_connect(c, tree) < 0) {
 		smb_disconnect(c);
 		return NULL;
 	}

@@ -1,7 +1,11 @@
 #ifndef HUMAN_H
 #define HUMAN_H
-const char *human_file_size(long long int size);
-long long int from_human_file_size(const char *s);
-const char *human_time(int time);
+
+const char *smb_hsize(uint64_t size, char *buf);
+
+uint64_t smb_decode_hsize(const char *s);
+
+const char *smb_htime(time_t time);
+
 #endif
 

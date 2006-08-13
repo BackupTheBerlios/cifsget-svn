@@ -20,7 +20,7 @@ void smb_cp_init(void);
 
 #define WRITE_BUF_OEM(p,l,s)	smb_cp_write(smb_cp_sys_to_oem, &p, l, s)
 #define WRITE_BUF_UCS(p,l,s)	smb_cp_write(smb_cp_sys_to_ucs, &p, l, s)
-#define WRITE_STRING_OEM(p,l,s) do { smb_cp_write(smb_cp_sys_to_oem, &p, l, s); WRITE_WORD(p, 0); } while(0)
+#define WRITE_STRING_OEM(p,l,s) do { smb_cp_write(smb_cp_sys_to_oem, &p, l, s); WRITE_BYTE(p, 0); } while(0)
 #define WRITE_STRING_UCS(p,l,s) do { smb_cp_write(smb_cp_sys_to_ucs, &p, l, s); WRITE_WORD(p, 0); } while(0)
 
 #endif

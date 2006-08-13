@@ -23,7 +23,9 @@ struct	packet
 	be_word	length
 	be_long	magic
 	byte	command
-	long	status
+	byte	error_class
+	byte	reserved
+	word	error_code
 	byte	flags
 	word	flags2
 	word	pidh
@@ -47,15 +49,15 @@ end	packet
 
 struct	inegot
         word dialectindex
-        byte  securitymode
+        byte securitymode
         word maxmpxcount
         word maxnumbervcs
-        long  maxbuffersize
-        long  maxrawsize
-        long  sessionkey
-        long  capabilities
-	nt_time  systemtime
-        signed_word  servertimezone
+        long maxbuffersize
+        long maxrawsize
+        long sessionkey
+        long capabilities
+		nt_time time
+        signed_word zone
         byte  encryptionkeylength
 end	inegot
 
@@ -64,11 +66,11 @@ struct	osessionsetup
 	word maxbuffersize
 	word maxmpxcount
 	word vcnumber
-	long  sessionkey
+	long sessionkey
 	word ipwdlen
 	word pwdlen
-	long  reserved
-	long  capabilities
+	long reserved
+	long capabilities
 end	osessionsetup
 
 
