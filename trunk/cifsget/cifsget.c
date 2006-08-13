@@ -11,25 +11,23 @@ usage: cifsget OPTION | URI | UNC | SHORT ...\n\
   \n\
   OPTION:\n\
   -l                    list directory contents\n\
-  -S					calculate size\n\
-  -o file		output file\n\
-  -O dir		output directory\n\
+  -S                    calculate directory size\n\
+  -o file               output file\n\
+  -O dir                output directory\n\
   -s <int>[k|m|g|t]     limit download speed\n\
   -h                    show this message and exit\n\
   -d [0-6]              debug level, default - 3\n\
-  -i ip			destination ip\n\
-  -p port		destination port\n\
+  -i ip                 destination ip\n\
+  -p port               destination port\n\
 ");
 }
 
 smb_flow_p flow;
+int opt_dirsize = 0;
 
 void smb_print_file(smb_dirinfo_p di) {
-	if (di->attributes & FILE_ATTRIBUTE_DIRECTORY) {
-		smb_log_normal(" <dir> %s/\n", di->name);
-	} else {
-		smb_log_normal("%6s %s\n", smb_hsize(di->file_size, NULL), di->name);
-	}
+	int dir = di->attributes & FILE_ATTRIBUTE_DIRECTORY;
+	printf("%6s %s%s\n", (!dir || opt_dirsize) ? smb_hsize(di->file_size, NULL) : " <dir>" , di->name, dir ? "/":"");
 }
 
 int smb_print_node(smb_node_p n) {
@@ -48,7 +46,7 @@ int smb_print_node(smb_node_p n) {
 			type = "<unk>";
 			break;		
 	}
-	smb_log_normal(" %s %s\t%s\n", type, n->name, n->comment);
+	printf(" %s %s\t%s\n", type, n->name, n->comment);
 	return 0;
 }
 
@@ -64,6 +62,51 @@ int smb_print_status(const char *fmt, ...) {
 	fflush(stdout);
 	len = res;
 	return res;
+}
+
+int smb_get_size_dir(smb_connect_p c, const char *path, const char *name, uint64_t *size) {
+	smb_find_t fi;
+	smb_dirinfo_t di;
+	char *mask;
+	
+	
+	if (smb_log_level >= SMB_LOG_NORMAL) {
+		smb_print_status("%6s %s", smb_hsize(*size, NULL), name);
+	}
+	
+	asprintf(&mask, "%s/*", path);
+	if (smb_find_first(c, mask, &fi)) {
+		free(mask);
+		return -1;
+	}
+	free(mask);	
+	
+	while (!smb_find_next(&fi, &di)) {
+		if (di.attributes & FILE_ATTRIBUTE_DIRECTORY) {
+			char *pt, *nm;
+			asprintf(&pt, "%s/%s", path, di.name);
+			asprintf(&nm, "%s/%s", name, di.name);
+			smb_get_size_dir(c, pt, nm, size);
+			free(pt);
+			free(nm);
+		} else {
+			*size += di.file_size;
+		}
+	}
+	
+	smb_find_close(&fi);
+	
+	return 0;
+}
+
+int smb_calc_size(smb_connect_p c, const char *path, smb_dirinfo_p di) {
+	if (di->attributes & FILE_ATTRIBUTE_DIRECTORY) {
+		smb_get_size_dir(c, path,  di->name, &di->file_size);
+		if (smb_log_level >= SMB_LOG_NORMAL) {
+			smb_print_status("");
+		}
+	}
+	return 0;
 }
 
 int smb_download_file(smb_connect_p c, smb_dirinfo_p di, const char *src, const char *dst) {
@@ -207,10 +250,14 @@ int smb_list_dir(smb_connect_p c, const char *path) {
 		return -1;
 	}
 	while (!smb_find_next(&fi, &di)) {
-		smb_print_file(&di);
-		if (!(di.attributes & FILE_ATTRIBUTE_DIRECTORY)) {
-			total += di.file_size;
+		if (di.attributes & FILE_ATTRIBUTE_DIRECTORY && opt_dirsize) {
+			char *pt;
+			asprintf(&pt, "%s/%s", path, di.name);
+			smb_calc_size(c, pt, &di);
+			free(pt);
 		}
+		smb_print_file(&di);
+		total += di.file_size;
 	}
 	smb_find_close(&fi);
 	smb_log_normal("total: %s\n", smb_hsize(total, NULL));
@@ -307,52 +354,6 @@ int smb_download(smb_connect_p c, const char *path, smb_dirinfo_p di) {
 	return 0;
 }
 
-int smb_get_size_dir(smb_connect_p c, const char *path, const char *name, uint64_t *size) {
-	smb_find_t fi;
-	smb_dirinfo_t di;
-	char *mask;
-	
-	
-	smb_print_status("%6s %s", smb_hsize(*size, NULL), name);
-	
-	asprintf(&mask, "%s/*", path);
-	if (smb_find_first(c, mask, &fi)) {
-		free(mask);
-		return -1;
-	}
-	free(mask);	
-	
-	while (!smb_find_next(&fi, &di)) {
-		if (di.attributes & FILE_ATTRIBUTE_DIRECTORY) {
-			char *pt, *nm;
-			asprintf(&pt, "%s/%s", path, di.name);
-			asprintf(&nm, "%s/%s", name, di.name);
-			smb_get_size_dir(c, pt, nm, size);
-			free(pt);
-			free(nm);
-		} else {
-			*size += di.file_size;
-		}
-	}
-	
-	smb_find_close(&fi);
-	
-	return 0;
-}
-
-uint64_t smb_calc_size(smb_connect_p c, const char *path, smb_dirinfo_p di) {
-	uint64_t size = 0;
-	if (!c) return 0;
-	if (di->attributes & FILE_ATTRIBUTE_DIRECTORY) {
-		smb_get_size_dir(c, path,  di->name, &size);
-		smb_print_status("");
-	} else {
-		size += di->file_size;
-	}
-	smb_log_msg("%6s %s\n", smb_hsize(size, NULL), di->name);
-	return size;
-}
-
 int smb_action(int action, smb_uri_p uri) {
 	smb_connect_p c;
 	smb_find_t fi;
@@ -380,9 +381,6 @@ int smb_action(int action, smb_uri_p uri) {
 					case 'l':
 						smb_list(c, path, &di);
 						break;
-					case 'S':
-						smb_calc_size(c, path, &di);
-						break;		
 				}
 			}
 			smb_find_close(&fi);
@@ -396,9 +394,6 @@ int smb_action(int action, smb_uri_p uri) {
 					break;
 				case 'l':
 					smb_list(c, "", &di);
-					break;
-				case 'S':
-					smb_calc_size(c, "", &di);
 					break;
 			}
 		}
@@ -451,7 +446,7 @@ int main(int argc, char** argv) {
 				action = 'l';
 				break;
 			case 'S':
-				action = 'S';
+				opt_dirsize = 1;
 				break;
 			case 'i':
 				free(uri->addr);
