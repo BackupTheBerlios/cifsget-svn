@@ -7,8 +7,9 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#ifdef WINDOWS
+#ifdef WIN32
 
+#include <windows.h>
 #include <winsock.h>
 
 #ifndef MSG_WAITALL
@@ -36,13 +37,13 @@
 
 #include "transport.h"
 #include "proto.h"
-#include "transact.h"
+
 #include "find.h"
 #include "rap.h"
-#include "debug.h"
-
 
 #ifdef _LIBCIFS
+
+#include "transact.h"
 
 #include "smb.h"
 #include "trans2.h"
@@ -54,6 +55,8 @@
 #include "codepage.h"
 
 #endif
+
+#include "debug.h"
 
 #endif /* LIBCIFS_INCLUDES_H */
 

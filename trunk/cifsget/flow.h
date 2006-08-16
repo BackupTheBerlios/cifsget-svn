@@ -9,7 +9,7 @@
 /* speed = d / (c - a) */
 /* time = c - start    */
 
-typedef struct smb_flow_s {
+typedef struct cifs_flow_s {
 	int limit, speed;	/* bytes per second */
 	uint64_t total;		/* bytes */
 	time_t time;		/* work time in seconds */
@@ -18,14 +18,14 @@ typedef struct smb_flow_s {
 	uint64_t interval; 	/* flip interval in microseconds */
 	int d, e;
 	
-} smb_flow_t;
-typedef smb_flow_t *smb_flow_p;
+} cifs_flow_t;
+typedef cifs_flow_t *cifs_flow_p;
 
 
-smb_flow_p smb_flow_new(void);
-void smb_flow_reset(smb_flow_p f);
-int smb_flow(smb_flow_p f, int delta);
-void smb_flow_free(smb_flow_p f);
+cifs_flow_p cifs_flow_new(void);
+void cifs_flow_reset(cifs_flow_p f);
+int cifs_flow(cifs_flow_p f, int delta);
+void cifs_flow_free(cifs_flow_p f);
 	
 #endif /* FLOW_H */
 

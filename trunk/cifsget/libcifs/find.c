@@ -1,9 +1,18 @@
 #include "includes.h"
 
-void smb_build_dirinfo(smb_connect_p c, smb_dirinfo_p d, char *p) {
+struct cifs_find_s {
+	cifs_connect_p c;
+	cifs_trans_t t;
+	int sid;
+	int end;
+	char *cur;
+	int count;
+};
+
+static void cifs_build_dirinfo(cifs_connect_p c, cifs_dirinfo_p d, char *p) {
 	int nl;
 	nl = GET_DIRINFO_NAME_LEN(p);
-	nl = (nl<SMB_MAX_PATH)?nl:(SMB_MAX_PATH-1);
+	nl = (nl<CIFS_MAX_PATH)?nl:(CIFS_MAX_PATH-1);
 	d->creation_time = GET_DIRINFO_CREATION_TIME(p);
 	d->access_time = GET_DIRINFO_ACCESS_TIME(p);
 	d->write_time = GET_DIRINFO_WRITE_TIME(p);
@@ -13,15 +22,15 @@ void smb_build_dirinfo(smb_connect_p c, smb_dirinfo_p d, char *p) {
 	//d->attributes = GET_DIRINFO_ATTRIBUTES(p);
 	d->directory = GET_DIRINFO_ATTRIBUTES(p)&FILE_ATTRIBUTE_DIRECTORY ? 1 : 0;
 	if (c->capabilities & CAP_UNICODE) {
-		smb_cp_block(smb_cp_ucs_to_sys, d->name, sizeof(d->name), PTR_DIRINFO_NAME(p), nl);
+		cifs_cp_block(cifs_cp_ucs_to_sys, d->name, sizeof(d->name), PTR_DIRINFO_NAME(p), nl);
 	} else {
-		smb_cp_block(smb_cp_oem_to_sys, d->name, sizeof(d->name), PTR_DIRINFO_NAME(p), nl);
+		cifs_cp_block(cifs_cp_oem_to_sys, d->name, sizeof(d->name), PTR_DIRINFO_NAME(p), nl);
 	}
 }
 
-int smb_find_first_req(smb_connect_p c, const char *mask) {
+static int cifs_find_first_req(cifs_connect_p c, const char *mask) {
 	char *o=c->o, *b, *w, *p;
-	smb_trans_req(c, SMBtrans2, NULL, 1, TRANSACT2_FINDFIRST);
+	cifs_trans_req(c, SMBtrans2, NULL, 1, TRANSACT2_FINDFIRST);
 	
 	w = PTR_PACKET_W(o);
 	b = PTR_PACKET_B(o);
@@ -38,23 +47,23 @@ int smb_find_first_req(smb_connect_p c, const char *mask) {
 		//WRITE_ALIGN(p, c->o, 2);
 		char *tmp = p;
 		WRITE_STRING_UCS(p, c->o_end, mask);
-		smb_path_fix_ucs(tmp);
+		cifs_path_fix_ucs(tmp);
 	} else {
 		WRITE_STRING_OEM(p, c->o_end, mask);
-		smb_path_fix_oem(PTR_OFINDFIRST_MASK(b));
+		cifs_path_fix_oem(PTR_OFINDFIRST_MASK(b));
 	}
 	END_PACKET_B(o, p);
 	SET_OTRANS_PARAM_COUNT(w, LEN_PACKET_B(o));
 	SET_OTRANS_TOTAL_PARAM_COUNT(w, LEN_PACKET_B(o));
 	
-	smb_log_struct(b, OFINDFIRST);
+	cifs_log_struct(b, OFINDFIRST);
 
 	return 0;
 }
 
-int smb_find_next_req(smb_connect_p c, int sid) {
+static int cifs_find_next_req(cifs_connect_p c, int sid) {
 	char *o=c->o, *b, *w;
-	smb_trans_req(c, SMBtrans2, NULL, 1, TRANSACT2_FINDNEXT);
+	cifs_trans_req(c, SMBtrans2, NULL, 1, TRANSACT2_FINDNEXT);
 	
 	w = PTR_PACKET_W(o);
 	b = PTR_PACKET_B(o);
@@ -71,12 +80,12 @@ int smb_find_next_req(smb_connect_p c, int sid) {
 	SET_OTRANS_PARAM_COUNT(w, LEN_PACKET_B(o));
 	SET_OTRANS_TOTAL_PARAM_COUNT(w, LEN_PACKET_B(o));
 	
-	smb_log_struct(b, OFINDNEXT);
+	cifs_log_struct(b, OFINDNEXT);
 
 	return 0;
 }
 
-int smb_find_close_req(smb_connect_p c, int sid) {
+static int cifs_find_close_req(cifs_connect_p c, int sid) {
 	char *o=c->o;
 	SET_PACKET_COMMAND(o, SMBfindclose);
 	SETLEN_PACKET_W(o, 2);
@@ -85,41 +94,50 @@ int smb_find_close_req(smb_connect_p c, int sid) {
 	return 0;
 }
 
-int smb_find_first(smb_connect_p c, const char *mask, smb_find_p f) {
+cifs_find_p cifs_find_first(cifs_connect_p c, const char *mask) {
+	cifs_find_p f;
+
+	NEW_STRUCT(f);
 	
+	if (f == NULL) return NULL;
+	
+	if (cifs_trans_alloc(&f->t)) {
+		FREE_STRUCT(f);
+		return NULL;
+	}
+			
 	f->c = c;
 	
-	smb_find_first_req(c, mask);
-
-	if (smb_trans_alloc(&f->t)) return -1;
+	cifs_find_first_req(c, mask);
 	
-	if (smb_trans_request(c, &f->t)) {
-		smb_trans_free(&f->t);
-		return -1;
+	if (cifs_trans_request(c, &f->t)) {
+		cifs_trans_free(&f->t);
+		FREE_STRUCT(f);
+		return NULL;
 	}
 
-	smb_log_trans("findfirst", &f->t);
-	smb_log_struct(f->t.param, IFINDFIRST);
+	cifs_log_trans("findfirst", &f->t);
+	cifs_log_struct(f->t.param, IFINDFIRST);
 
 	f->end = GET_IFINDFIRST_END_OF_SEARCH(f->t.param);
 	f->sid = GET_IFINDFIRST_SID(f->t.param);
 	f->cur = f->t.data;
 	f->count = GET_IFINDFIRST_SEARCH_COUNT(f->t.param);
 	
-	return 0;
+	return f;
 }
 
-int smb_find_next(smb_find_p f, smb_dirinfo_p d) {
+int cifs_find_next(cifs_find_p f, cifs_dirinfo_p d) {
 loop:
 	if (f->count == 0) {
 		if (f->end) return 1;
-		smb_find_next_req(f->c, f->sid);
+		cifs_find_next_req(f->c, f->sid);
 		
-		if (smb_send(f->c)) return -1;
-		if (smb_trans_recv(f->c, &f->t)) return -1;
+		if (cifs_send(f->c)) return -1;
+		if (cifs_trans_recv(f->c, &f->t)) return -1;
 
-		smb_log_trans("findnext", &f->t);
-		smb_log_struct(f->t.param, IFINDNEXT);
+		cifs_log_trans("findnext", &f->t);
+		cifs_log_struct(f->t.param, IFINDNEXT);
 
 		f->end = GET_IFINDNEXT_END_OF_SEARCH(f->t.param);
 		f->cur = f->t.data;
@@ -127,49 +145,49 @@ loop:
 		
 		if (f->count == 0) return 1;
 	}
-	smb_build_dirinfo(f->c, d, f->cur);
+	cifs_build_dirinfo(f->c, d, f->cur);
 	f->cur += GET_DIRINFO_NEXT_ENTRY_OFFSET(f->cur);
 	f->count--;
 	if (d->directory && (!strcmp(d->name, ".") || !strcmp(d->name, ".."))) goto loop;
 	return 0;
 }
 
-int smb_find_close(smb_find_p f) {
-	smb_trans_free(&f->t);
+int cifs_find_close(cifs_find_p f) {
+	cifs_trans_free(&f->t);
 	if (!f->end) {
-		smb_find_close_req(f->c, f->sid);
-		if (smb_request(f->c)) return -1;
+		cifs_find_close_req(f->c, f->sid);
+		if (cifs_request(f->c)) return -1;
 	}
 	return 0;
 }
 
-smb_dirinfo_p smb_info(smb_connect_p c, const char *name) {
-	smb_trans_t tr;
-	smb_dirinfo_p di;
+cifs_dirinfo_p cifs_info(cifs_connect_p c, const char *name) {
+	cifs_trans_t tr;
+	cifs_dirinfo_p di;
 
-	smb_find_first_req(c, name);
-	if (smb_trans_alloc(&tr)) return NULL;
-	if (smb_trans_request(c, &tr)) {
-		smb_trans_free(&tr);
+	cifs_find_first_req(c, name);
+	if (cifs_trans_alloc(&tr)) return NULL;
+	if (cifs_trans_request(c, &tr)) {
+		cifs_trans_free(&tr);
 		return NULL;	
 	}	
 
-	smb_log_trans("info", &tr);
-	smb_log_struct(tr.param, IFINDFIRST);
+	cifs_log_trans("info", &tr);
+	cifs_log_struct(tr.param, IFINDFIRST);
 
 	if (GET_IFINDFIRST_SEARCH_COUNT(tr.param) != 1) {
-		smb_trans_free(&tr);
+		cifs_trans_free(&tr);
 		if (!GET_IFINDFIRST_END_OF_SEARCH(tr.param)) {
-			smb_find_close_req(c, GET_IFINDFIRST_SID(tr.param));
-			smb_request(c);
+			cifs_find_close_req(c, GET_IFINDFIRST_SID(tr.param));
+			cifs_request(c);
 		}
 		errno = EMLINK;
 		return NULL;
 	}
 	
 	NEW_STRUCT(di);
-	smb_build_dirinfo(c, di, tr.data);
-	smb_trans_free(&tr);
+	cifs_build_dirinfo(c, di, tr.data);
+	cifs_trans_free(&tr);
 	return di;
 }
 

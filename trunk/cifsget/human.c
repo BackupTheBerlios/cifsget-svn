@@ -1,6 +1,6 @@
 #include "includes.h"
 
-const char *smb_hsize(uint64_t size, char *buf) {
+const char *cifs_hsize(uint64_t size, char *buf) {
 	static char sbuf[64];	
 	double s = size;
 	static const double t = 1000.0;
@@ -20,7 +20,7 @@ const char *smb_hsize(uint64_t size, char *buf) {
 	return buf;
 }
 
-uint64_t smb_decode_hsize(const char *s) {
+uint64_t cifs_decode_hsize(const char *s) {
 	long long int x;
 	char *p;
 	x = strtol(s, &p, 10);
@@ -44,7 +44,7 @@ uint64_t smb_decode_hsize(const char *s) {
 	return x;
 }
 
-const char *smb_htime(time_t time) {
+const char *cifs_htime(time_t time) {
 	static char buf[64];
 	int d, h, m, s;
 	d = time / 86400;

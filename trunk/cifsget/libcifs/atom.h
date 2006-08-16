@@ -8,14 +8,14 @@ typedef unsigned int uint_t;
 #define NEW_STRUCT(x) x = calloc(1, sizeof(*(x)))
 #define FREE_STRUCT(x) do { free(x); x = NULL; } while(0)
 
-static inline char *smb_write_string(char *p, const char *s) {
+static inline char *cifs_write_string(char *p, const char *s) {
 	do {
 		*p++=*s;
 	} while (*s++);
 	return p;
 }
 
-static inline char *smb_read_string(char **p) {
+static inline char *cifs_read_string(char **p) {
 	int len = strlen(*p);
 	char *t = malloc(len+1);
 	strcpy(t, *p);
@@ -23,7 +23,7 @@ static inline char *smb_read_string(char **p) {
 	return t;
 }
 
-#define READ_STRING(p)	(smb_read_string(&p))
+#define READ_STRING(p)	(cifs_read_string(&p))
 
 #define READ_BYTE(p)	(CVAL(p, 0),p+=1)
 #define READ_WORD(p)	(SVAL(p, 0),p+=2)
@@ -37,7 +37,7 @@ static inline char *smb_read_string(char **p) {
 #define READ_BE_SIGNED_WORD(p)	(RSVALS(p, 0),p+=2)
 #define READ_BE_SIGNED_LONG(p)	(RIVALS(p, 0),p+=4)
 
-#define WRITE_STRING(p, s) (p=smb_write_string(p, s))
+#define WRITE_STRING(p, s) (p=cifs_write_string(p, s))
 #define WRITE_FORMAT(p, s, ...) (p+=sprintf(p, s, __VA_ARGS__)+1)
 
 #define WRITE_BYTE(p, v) (SCVAL(p, 0, v),p+=1)

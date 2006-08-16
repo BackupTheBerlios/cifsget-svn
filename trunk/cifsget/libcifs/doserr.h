@@ -120,7 +120,7 @@
 #define ERRinvdevice 7 /* Invalid device */
 #define ERRqfull 49 /* Print queue full */
 #define ERRqtoobig 50 /* Queued item too big */
-#define ERRinvpfid 52 /* Invalid print file in smb_fid */
+#define ERRinvpfid 52 /* Invalid print file in cifs_fid */
 #define ERRsmbcmd 64 /* Unrecognised command */
 #define ERRsrverror 65 /* smb server internal error */
 #define ERRfilespecs 67 /* fid and pathname invalid combination */

@@ -1,35 +1,35 @@
 #include "includes.h"
 
-int smb_download_mirror(smb_mirror_p src, const char *dst) {
-	smb_mirror_p m;
+int cifs_download_mirror(cifs_mirror_p src, const char *dst) {
+	cifs_mirror_p m;
 	int work, maxfd, ret, len, tot;
 	fd_set fds;
 	void *data;
-	smb_flow_p flow;
+	cifs_flow_p flow;
 
 	work = 0;
 	for (m = src ; m ; m = m->next) {
-		m->conn = smb_connect_uri(&m->uri);
+		m->conn = cifs_connect_uri(&m->uri);
 		if (!m->conn) {
 			perror(m->uri.name);
 			continue;
 		}	
 		
-		if (smb_info(m->conn, m->uri.path, &m->info)) goto err;
-		m->fid = smb_open(m->conn, m->uri.path, OPEN_FLAGS_OPEN_READ);
+		if (cifs_info(m->conn, m->uri.path, &m->info)) goto err;
+		m->fid = cifs_open(m->conn, m->uri.path, OPEN_FLAGS_OPEN_READ);
 		if (m->fid < 0) goto err;
 		m->fd = open(m->uri.file, O_CREAT | O_WRONLY | O_LARGEFILE, 0664);
-		if (smb_read_send(m->conn, m->fid, SMB_MAX_RAW, 0)) goto err;
+		if (cifs_read_send(m->conn, m->fid, SMB_MAX_RAW, 0)) goto err;
 		work++;
-		smb_flow_reset(&m->flow);
+		cifs_flow_reset(&m->flow);
 		continue;
 err:		
-		smb_disconnect(m->conn);
+		cifs_disconnect(m->conn);
 		m->conn = NULL;
 		perror(m->uri.name);
 	}
 	
-	flow = smb_flow_new();
+	flow = cifs_flow_new();
 	
 	while (work) {
 		FD_ZERO(&fds);
@@ -41,23 +41,23 @@ err:
 		ret = select(maxfd+1, &fds, NULL, NULL, NULL);
 		tot = 0;
 		for (m = src ; m ; m = m->next) if (m->conn) {
-			if (FD_ISSET(m->conn->sock, &fds) && !smb_recv_async(m->conn)) {
-				len = smb_read_get(m->conn, &data);
+			if (FD_ISSET(m->conn->sock, &fds) && !cifs_recv_async(m->conn)) {
+				len = cifs_read_get(m->conn, &data);
 				tot += len;
-				smb_flow(&m->flow, len);
+				cifs_flow(&m->flow, len);
 				write(m->fd, data, len);
 				m->offset += len;
 				if (m->offset < m->info.file_size) {
-					smb_read_send(m->conn, m->fid, SMB_MAX_RAW, m->offset);
+					cifs_read_send(m->conn, m->fid, SMB_MAX_RAW, m->offset);
 				} else {
 					close(m->fd);
-					smb_disconnect(m->conn);
+					cifs_disconnect(m->conn);
 					m->conn = NULL;
 					work--;
 				}
 			}			
 		}
-		if (smb_flow(flow, tot)) {
+		if (cifs_flow(flow, tot)) {
 			for (m = src ; m ; m = m->next)printf("%6s/s ", human_file_size(m->flow.speed));
 			printf("%6s/s\r", human_file_size(flow->speed));
 			fflush(stdout);

@@ -2,35 +2,35 @@
 
 #define DEFAULT_INTERVAL 500000
 
-static void smb_sleep(uint64_t time) {
+static void cifs_sleep(uint64_t time) {
 	struct timespec tm;
 	tm.tv_sec = time/1000000;
 	tm.tv_nsec = time%1000000*1000+999;
 	while (nanosleep(&tm, &tm) && errno == EINTR);
 }
 
-static uint64_t smb_gettime(void) {
+static uint64_t cifs_gettime(void) {
 	struct timeval cur;
 	gettimeofday(&cur, NULL);
 	return (uint64_t)cur.tv_sec * 1000000 + cur.tv_usec;
 }
 
-void smb_flow_reset(smb_flow_p f) {
+void cifs_flow_reset(cifs_flow_p f) {
 	assert(f);
 	ZERO_STRUCTP(f);
 	f->interval = DEFAULT_INTERVAL;
-	f->start = smb_gettime();
+	f->start = cifs_gettime();
 	f->a = f->b = f->c = f->start;
 }
 
-smb_flow_p smb_flow_new(void) {
-	smb_flow_p f;
+cifs_flow_p cifs_flow_new(void) {
+	cifs_flow_p f;
 	NEW_STRUCT(f);
-	smb_flow_reset(f);
+	cifs_flow_reset(f);
 	return f;
 }
 
-int smb_flow(smb_flow_p f, int delta) {
+int cifs_flow(cifs_flow_p f, int delta) {
 	uint64_t t, x, w;
 	assert(f);
 	
@@ -40,7 +40,7 @@ int smb_flow(smb_flow_p f, int delta) {
 
 	x = (uint64_t)f->d * 1000000;
 
-	f->c = smb_gettime();
+	f->c = cifs_gettime();
 
 	f->time = (f->c - f->start) / 1000000;
 	
@@ -61,7 +61,7 @@ int smb_flow(smb_flow_p f, int delta) {
 
 	if (f->limit > 0) {
 		w = x / f->limit;
-		if (w > t) smb_sleep(w - t);
+		if (w > t) cifs_sleep(w - t);
 	}
 	
 	if (f->e == 0) return 1;
@@ -69,7 +69,7 @@ int smb_flow(smb_flow_p f, int delta) {
 	return 0;
 }
 
-void smb_flow_free(smb_flow_p f) {
+void cifs_flow_free(cifs_flow_p f) {
 	free(f);
 }
 

@@ -29,7 +29,7 @@
 
 #define SMB_PORTS "445 139"
 
-enum smb_signing_state {SMB_SIGNING_OFF, SMB_SIGNING_SUPPORTED, 
+enum cifs_signing_state {SMB_SIGNING_OFF, SMB_SIGNING_SUPPORTED, 
 			SMB_SIGNING_REQUIRED, SMB_SIGNING_AUTO};
 
 /* deny modes */
@@ -480,14 +480,14 @@ typedef uint64_t NTTIME;
 #define NOTIFY_ACTION_REMOVED_STREAM 7
 #define NOTIFY_ACTION_MODIFIED_STREAM 8
 
-/* seek modes for smb_seek */
+/* seek modes for cifs_seek */
 #define SEEK_MODE_START   0
 #define SEEK_MODE_CURRENT 1
 #define SEEK_MODE_END     2
 
 /* where to find the base of the SMB packet proper */
-/* REWRITE TODO: smb_base needs to be removed */
-#define smb_base(buf) (((char *)(buf))+4)
+/* REWRITE TODO: cifs_base needs to be removed */
+#define cifs_base(buf) (((char *)(buf))+4)
 
 /* we don't allow server strings to be longer than 48 characters as
    otherwise NT will not honour the announce packets */
@@ -550,7 +550,7 @@ typedef uint64_t NTTIME;
 #define CAP_EXTENDED_SECURITY	0x80000000
 
 /*
- * Global value meaning that the smb_uid field should be
+ * Global value meaning that the cifs_uid field should be
  * ingored (in share level security and protocol level == CORE)
  */
 

@@ -2,7 +2,7 @@
 
 #define HEX_TO_INT(c)	((c>='0' && c<='9')?(c-'0'):((c>='A' && c<='F')?(c-'A'+10):((c>='a' && c<='f')?(c-'a'+10):0)))
 
-char *smb_uri_unescape(char *s) {
+char *cifs_uri_unescape(char *s) {
 	char *i=s, *o=s;
 	if (s == NULL) return NULL;
         while (*i) {
@@ -28,7 +28,7 @@ char *smb_uri_unescape(char *s) {
 
 // smb://[login[:password]@]host[:port][/share(/name)*]
 
-/*int smb_parse_dest(char *s, smb_uri_p uri) {
+/*int cifs_parse_dest(char *s, cifs_uri_p uri) {
 	char *at, *co, *be, *en, *t;
 	be = s;
 	en = strechr(be, NULL, '/');
@@ -70,11 +70,11 @@ char *smb_uri_unescape(char *s) {
 #define SKIP_SLASH(p) while (*p && (*p == '/' || *p == '\\')) p++
 #define NEXT_SLASH(p) while (*p && *p != '/' && *p != '\\') p++
 
-int smb_uri_parse(smb_uri_p uri, const char *str) {
+int cifs_uri_parse(cifs_uri_p uri, const char *str) {
 	char *o, *s, *a, *b;
 
 	s = strdup(str);
-	smb_uri_unescape(s);
+	cifs_uri_unescape(s);
 
 	a = strstr(s, "://");
 	if (a) {
@@ -112,7 +112,7 @@ int smb_uri_parse(smb_uri_p uri, const char *str) {
 	return 0;
 }
 
-void smb_uri_free(smb_uri_p uri) {
+void cifs_uri_free(cifs_uri_p uri) {
 	free(uri->scheme);
 	free(uri->name);
 	free(uri->tree);

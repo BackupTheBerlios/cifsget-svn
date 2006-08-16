@@ -1,7 +1,7 @@
 #ifndef URI_H
 #define URI_H
 
-typedef struct smb_uri_s {
+typedef struct cifs_uri_s {
 	char *scheme;
 	char *name;
 	char *tree;
@@ -12,11 +12,11 @@ typedef struct smb_uri_s {
 	char *password;
 	char *addr; /*ip*/
 	int port;
-} smb_uri_t;
-typedef smb_uri_t *smb_uri_p;
+} cifs_uri_t;
+typedef cifs_uri_t *cifs_uri_p;
 
-char *smb_uri_unescape(char *s);
-int smb_uri_parse(smb_uri_p uri, const char *s);
-void smb_uri_free(smb_uri_p uri);
+char *cifs_uri_unescape(char *s);
+int cifs_uri_parse(cifs_uri_p uri, const char *s);
+void cifs_uri_free(cifs_uri_p uri);
 
 #endif /* URI_H */

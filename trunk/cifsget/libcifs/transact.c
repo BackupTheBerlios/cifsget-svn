@@ -1,15 +1,15 @@
 #include "includes.h"
 
-void smb_trans_req(smb_connect_p c, int command, char *name, int setup_count, ...) {
+void cifs_trans_req(cifs_connect_p c, int command, char *name, int setup_count, ...) {
 	char *w, *b, *o = c->o;	
 	va_list st;
 	SET_PACKET_COMMAND(o, command);
 	w = PTR_PACKET_W(o);
-	SET_OTRANS_MAX_PARAM_COUNT(w, SMB_TRANS_MAX_PARAM_COUNT);
-	SET_OTRANS_MAX_DATA_COUNT(w, SMB_TRANS_MAX_DATA_COUNT);
-	SET_OTRANS_MAX_SETUP_COUNT(w, SMB_TRANS_MAX_SETUP_COUNT);
+	SET_OTRANS_MAX_PARAM_COUNT(w, CIFS_TRANS_MAX_PARAM_COUNT);
+	SET_OTRANS_MAX_DATA_COUNT(w, CIFS_TRANS_MAX_DATA_COUNT);
+	SET_OTRANS_MAX_SETUP_COUNT(w, CIFS_TRANS_MAX_SETUP_COUNT);
 	SET_OTRANS_FLAGS(w, 0);
-	SET_OTRANS_TIMEOUT(w, SMB_TRANS_TIMEOUT);
+	SET_OTRANS_TIMEOUT(w, CIFS_TRANS_TIMEOUT);
 	SET_OTRANS_RESERVED(w, 0);
 	SET_OTRANS_SETUP_COUNT(w, setup_count);
 	va_start(st, setup_count);
@@ -40,51 +40,51 @@ void smb_trans_req(smb_connect_p c, int command, char *name, int setup_count, ..
 	SET_OTRANS_DATA_OFFSET(w, b - PTR_PACKET_MAGIC(o));
 }
 
-int smb_trans_alloc(smb_trans_p t) {
+int cifs_trans_alloc(cifs_trans_p t) {
 	ZERO_STRUCTP(t);
-	t->setup = malloc(SMB_TRANS_MAX_SETUP_COUNT);
-	t->param = malloc(SMB_TRANS_MAX_PARAM_COUNT);
-	t->data = malloc(SMB_TRANS_MAX_DATA_COUNT);
+	t->setup = malloc(CIFS_TRANS_MAX_SETUP_COUNT);
+	t->param = malloc(CIFS_TRANS_MAX_PARAM_COUNT);
+	t->data = malloc(CIFS_TRANS_MAX_DATA_COUNT);
 	if (!t->setup || !t->param || !t->data) return -1;
 	return 0;
 }
 
-void smb_trans_free(smb_trans_p t) {
+void cifs_trans_free(cifs_trans_p t) {
 	free(t->setup);
 	free(t->param);
 	free(t->data);
 	ZERO_STRUCTP(t);
 }
 
-int smb_trans_recv(smb_connect_p c, smb_trans_p t) {
+int cifs_trans_recv(cifs_connect_p c, cifs_trans_p t) {
 	char *w;
 	unsigned int cnt, dis, len, off;
 
-	t->setup_total = SMB_TRANS_MAX_SETUP_COUNT;
-	t->param_total = SMB_TRANS_MAX_PARAM_COUNT;
-	t->data_total =  SMB_TRANS_MAX_DATA_COUNT;
+	t->setup_total = CIFS_TRANS_MAX_SETUP_COUNT;
+	t->param_total = CIFS_TRANS_MAX_PARAM_COUNT;
+	t->data_total =  CIFS_TRANS_MAX_DATA_COUNT;
 
 	t->setup_count = 0;
 	t->param_count = 0;
 	t->data_count = 0;
 
-	if(smb_recv(c)) return -1;
+	if(cifs_recv(c)) return -1;
 
 	do {
 		if ((GET_PACKET_COMMAND(c->i) != SMBtrans) &&
 				(GET_PACKET_COMMAND(c->i) != SMBtrans2)) {
-#ifdef	SMB_DUMP_FATAL
-			smb_log_msg("trans sync error %d %d\n", GET_PACKET_COMMAND(c->i), GET_PACKET_COMMAND(c->o));
-			smb_log_packet(c->i);
-			smb_log_packet(c->o);
+#ifdef	CIFS_DUMP_FATAL
+			cifs_log_msg("trans sync error %d %d\n", GET_PACKET_COMMAND(c->i), GET_PACKET_COMMAND(c->o));
+			cifs_log_packet(c->i);
+			cifs_log_packet(c->o);
 #endif
 			
 			errno = EIO;
 			return -1;
 		}
 
-		if (smb_packet_fail(c->i)) {
-			errno = smb_packet_error(c->i);
+		if (cifs_packet_fail(c->i)) {
+			errno = cifs_packet_error(c->i);
 			return -1;
 		}
 
@@ -92,7 +92,7 @@ int smb_trans_recv(smb_connect_p c, smb_trans_p t) {
 		
 		w = PTR_PACKET_W(c->i);
 		
-		smb_log_struct(w, ITRANSS);
+		cifs_log_struct(w, ITRANSS);
 
 		cnt = GET_ITRANSS_SETUP_COUNT(w) * 2;
 		if (cnt <= t->setup_total) {
@@ -108,9 +108,9 @@ int smb_trans_recv(smb_connect_p c, smb_trans_p t) {
 		if (cnt <= t->param_total) {
 			t->param_total = cnt;
 		} else {
-			smb_log_error("incorrect transaction\n");
-			smb_log_packet(c->i);
-			smb_log_struct(w, ITRANSS);
+			cifs_log_error("incorrect transaction\n");
+			cifs_log_packet(c->i);
+			cifs_log_struct(w, ITRANSS);
 
 			errno = EIO;
 			return -1;
@@ -120,9 +120,9 @@ int smb_trans_recv(smb_connect_p c, smb_trans_p t) {
 		if (cnt <= t->data_total) {
 			t->data_total = cnt;
 		} else {
-			smb_log_error("incorrect transaction\n");
-			smb_log_packet(c->i);
-			smb_log_struct(w, ITRANSS);
+			cifs_log_error("incorrect transaction\n");
+			cifs_log_packet(c->i);
+			cifs_log_struct(w, ITRANSS);
 
 			errno = EIO;
 			return -1;
@@ -135,9 +135,9 @@ int smb_trans_recv(smb_connect_p c, smb_trans_p t) {
 			
 			if (dis + cnt > t->param_total || off + cnt > len) {
 
-				smb_log_error("incorrect transaction\n");
-				smb_log_packet(c->i);
-				smb_log_struct(w, ITRANSS);
+				cifs_log_error("incorrect transaction\n");
+				cifs_log_packet(c->i);
+				cifs_log_struct(w, ITRANSS);
 
 				errno = EIO;
 				return -1;
@@ -154,9 +154,9 @@ int smb_trans_recv(smb_connect_p c, smb_trans_p t) {
 			
 			if (dis + cnt > t->data_total || off + cnt > len) {
 
-				smb_log_error("incorrect transaction\n");
-				smb_log_packet(c->i);
-				smb_log_struct(w, ITRANSS);
+				cifs_log_error("incorrect transaction\n");
+				cifs_log_packet(c->i);
+				cifs_log_struct(w, ITRANSS);
 
 				errno = EIO;
 				return -1;
@@ -168,16 +168,16 @@ int smb_trans_recv(smb_connect_p c, smb_trans_p t) {
 		
 		if (t->param_count == t->param_total && t->data_count == t->data_total) break;
 		
-		if(smb_recv_more(c)) return -1;
+		if(cifs_recv_more(c)) return -1;
 	} while(1);
 	return 0;
 }
 
 
-int smb_trans_request(smb_connect_p c, smb_trans_p t) {
-	smb_log_struct(PTR_PACKET_W(c->o), OTRANS);
-	if (smb_send(c)) return -1;
-	if (smb_trans_recv(c, t)) return -1;
+int cifs_trans_request(cifs_connect_p c, cifs_trans_p t) {
+	cifs_log_struct(PTR_PACKET_W(c->o), OTRANS);
+	if (cifs_send(c)) return -1;
+	if (cifs_trans_recv(c, t)) return -1;
 	return 0;
 }
 

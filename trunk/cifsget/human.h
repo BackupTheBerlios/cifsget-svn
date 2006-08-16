@@ -1,11 +1,11 @@
 #ifndef HUMAN_H
 #define HUMAN_H
 
-const char *smb_hsize(uint64_t size, char *buf);
+const char *cifs_hsize(uint64_t size, char *buf);
 
-uint64_t smb_decode_hsize(const char *s);
+uint64_t cifs_decode_hsize(const char *s);
 
-const char *smb_htime(time_t time);
+const char *cifs_htime(time_t time);
 
 #endif
 

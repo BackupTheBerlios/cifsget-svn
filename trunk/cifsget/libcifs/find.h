@@ -1,35 +1,28 @@
 #ifndef FIND_H
 #define FIND_H
 
-#define SMB_MAX_PATH 260
+#define CIFS_MAX_PATH 260
 
-typedef struct smb_dirinfo_s {
+typedef struct cifs_dirinfo_s {
 	int64_t creation_time;
 	int64_t access_time;
 	int64_t write_time;
 	int64_t change_time;
 	uint64_t file_size;
 	uint64_t allocation_size;
-	char directory;
+	int directory;
 	//uint32_t attributes;
-	char name[SMB_MAX_PATH];
-} smb_dirinfo_t;
-typedef smb_dirinfo_t *smb_dirinfo_p;
+	char name[CIFS_MAX_PATH];
+} cifs_dirinfo_t;
+typedef cifs_dirinfo_t *cifs_dirinfo_p;
 
-typedef struct smb_find_s {
-	smb_connect_p c;
-	smb_trans_t t;
-	int sid;
-	int end;
-	char *cur;
-	int count;
-} smb_find_t;
-typedef smb_find_t *smb_find_p;
+typedef struct cifs_find_s cifs_find_t;
+typedef cifs_find_t *cifs_find_p;
 
-int smb_find_first(smb_connect_p c, const char *mask, smb_find_p fi);
-int smb_find_next(smb_find_p fi, smb_dirinfo_p di);
-int smb_find_close(smb_find_p fi);
+cifs_find_p cifs_find_first(cifs_connect_p c, const char *mask);
+int cifs_find_next(cifs_find_p fi, cifs_dirinfo_p di);
+int cifs_find_close(cifs_find_p fi);
 
-smb_dirinfo_p smb_info(smb_connect_p c, const char *name);
+cifs_dirinfo_p cifs_info(cifs_connect_p c, const char *name);
 
 #endif /* FIND_H */

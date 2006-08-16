@@ -19,6 +19,9 @@ cifsget: cifsget.o ${OBJECTS}
 cifsmirror: cifsmirror.o ${OBJECTS}
 	${CC} -o $@ $^ ${LDFLAGS}
 
+cifsdump: cifsdump.c ${OBJECTS}
+	${CC} -o $@ $^ ${LDFLAGS} ${CFLAGS}
+
 clean:
 	rm -f *.o cifsmirror cifsget tags fusesmb
 	make -C libcifs clean
