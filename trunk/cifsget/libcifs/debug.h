@@ -1,21 +1,11 @@
-#ifndef _DEBUG_H 
+#ifndef _DEBUG_H
 #define _DEBUG_H
 
-/* *
- * cifs_log_msg	always
- * cifs_log_hex	always
- * cifs_log_struct	debug
- * cifs_log_packet  noisy
- * cifs_log_trans	noisy
- */
-
 extern int cifs_log_level;
+extern FILE *cifs_log_stream;
 
 int cifs_log_msg(const char *fmt, ...);
 int cifs_log_hex(void *buf, int len);
-#ifdef _LIBCIFS
-void cifs_log_trans(const char *name, cifs_trans_p t);
-#endif
 void cifs_log_flush(void);
 
 #define _PRINT_BYTE(name, val, len)		cifs_log_msg("b %s:\t%02X\t%u\n", #name, val, val)
@@ -64,7 +54,5 @@ void cifs_log_flush(void);
 #define cifs_log_hex_error(buf, len)  	cifs_log_hex_level(CIFS_LOG_ERROR, buf, len)
 #define cifs_log_hex_debug(buf, len)  	cifs_log_hex_level(CIFS_LOG_DEBUG, buf, len)
 #define cifs_log_hex_noisy(buf, len)  	cifs_log_hex_level(CIFS_LOG_NOISY, buf, len)
-
-void cifs_log_packet(char *p);
 
 #endif /* _DEBUG_H */

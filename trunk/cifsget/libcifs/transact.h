@@ -17,6 +17,8 @@ typedef struct cifs_trans_s {
 } cifs_trans_t;
 typedef cifs_trans_t *cifs_trans_p;
 
+void cifs_log_trans(const char *name, cifs_trans_p trans);
+
 int cifs_trans_alloc(cifs_trans_p t);
 void cifs_trans_free(cifs_trans_p t);
 

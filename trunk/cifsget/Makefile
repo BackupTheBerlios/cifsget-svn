@@ -1,8 +1,9 @@
 CFLAGS=-g -std=c99 -Wall -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
-OBJECTS=flow.o human.o uri.o libcifs/libcifs.a
+LDFLAGS=-Llibcifs
+SRCS=flow.c human.c uri.c cifsget.c fusecifs.c
 PREFIX=${HOME}
 
-all: libs cifsget
+all: libs cifsget fusecifs
 
 libs:
 	make -C libcifs
@@ -13,17 +14,14 @@ install: all
 .c.o:
 	${CC} ${CFLAGS} -c -o $@ $<
 
-cifsget: cifsget.o ${OBJECTS}
-	${CC} -o $@ $^ ${LDFLAGS}
+cifsget: cifsget.o flow.o human.o uri.o
+	$(CC) -o $@ $^ -lcifs $(LDFLAGS)
 
-cifsmirror: cifsmirror.o ${OBJECTS}
-	${CC} -o $@ $^ ${LDFLAGS}
-
-cifsdump: cifsdump.c ${OBJECTS}
-	${CC} -o $@ $^ ${LDFLAGS} ${CFLAGS}
+fusecifs: fusecifs.o
+	${CC} -o $@ $^ -lfuse -lcifs ${LDFLAGS}
 
 clean:
-	rm -f *.o cifsmirror cifsget tags fusesmb
+	rm -f *.o cifsmirror cifsget tags fusecifs
 	make -C libcifs clean
 
 distclean: clean
@@ -33,6 +31,8 @@ distclean: clean
 dist: distclean
 	cd .. ;	tar czf "cifsget_`date +%Y-%m-%d_%H%M`.tgz" cifsget
 
-fusesmb: transport.o proto.o transact.o debug.o find.o rap.o fusesmb.o uri.o codepage.o
-	${CC} -o $@ $^ ${LDFLAGS} -lfuse
+dep .depends:
+	$(CC) -MM $(CFLAGS) $(SRCS) 1> .depends
+
+include .depends
 

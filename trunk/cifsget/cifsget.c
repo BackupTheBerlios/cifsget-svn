@@ -1,7 +1,16 @@
-#include "includes.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <getopt.h>
+
+#include "libcifs/includes.h"
+#include "uri.h"
+#include "flow.h"
+#include "mirror.h"
+#include "human.h"
+#include "macros.h"
 
 void usage() {
-	cifs_log_msg("\
+	fprintf(stderr, "\
 usage: cifsget OPTION | URI | UNC | SHORT ...\n\
   \n\
   URI:    (smb|file|cifs)://host/share/path/NAME\n\
@@ -276,8 +285,8 @@ int cifs_list_node(cifs_connect_p c) {
 
 	if (!c) return -1;
 
-	if (cifs_tree_connect(c, "IPC$")) {
-		perror("ipc");
+	if (cifs_tree_connect(c, "IPC$") < 0) {
+		perror("IPC$");
 		return -1;
 	}
 	
@@ -439,6 +448,8 @@ int main(int argc, char** argv) {
 	flow = cifs_flow_new();	
 
 	NEW_STRUCT(uri);
+
+	cifs_log_stream = stderr;
 	
 	do {
 		opt = getopt(argc, argv, "-ls:o:O:d:i:p:hS");

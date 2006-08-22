@@ -1,6 +1,10 @@
 #ifndef URI_H
 #define URI_H
 
+#include <stdlib.h>
+#include <string.h>
+#include "macros.h"
+
 typedef struct cifs_uri_s {
 	char *scheme;
 	char *name;

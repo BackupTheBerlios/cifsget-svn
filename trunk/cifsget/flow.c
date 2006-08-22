@@ -1,4 +1,4 @@
-#include "includes.h"
+#include "flow.h"
 
 #define DEFAULT_INTERVAL 500000
 
@@ -16,7 +16,6 @@ static uint64_t cifs_gettime(void) {
 }
 
 void cifs_flow_reset(cifs_flow_p f) {
-	assert(f);
 	ZERO_STRUCTP(f);
 	f->interval = DEFAULT_INTERVAL;
 	f->start = cifs_gettime();
@@ -31,8 +30,7 @@ cifs_flow_p cifs_flow_new(void) {
 }
 
 int cifs_flow(cifs_flow_p f, int delta) {
-	uint64_t t, x, w;
-	assert(f);
+	uint64_t t, x, w;	
 	
 	f->total += delta;	
 	f->d += delta;

@@ -1,5 +1,14 @@
 #include "includes.h"
 
+void cifs_log_packet(char *p) {
+	cifs_log_debug("%s command %02X E %d_%d WC %d BC %d\n",
+			(GET_PACKET_FLAGS(p)&FLAG_REPLY)?"In ":"Out",
+			GET_PACKET_COMMAND(p),
+			GET_PACKET_ERROR_CLASS(p), GET_PACKET_ERROR_CODE(p),
+			GET_PACKET_WC(p), GET_PACKET_BC(p));
+	cifs_log_struct_noisy(p, PACKET);
+}
+
 int cifs_recv_skip_sock(int sock, int size);
 
 static int cifs_check_packet(char *p, int size) {
@@ -10,11 +19,11 @@ static int cifs_check_packet(char *p, int size) {
 	return 0;
 }
 
-int cifs_packet_fail(char *packet) {
-	return GET_PACKET_ERROR_CODE(packet);
+int cifs_packet_isfail(char *packet) {
+	return GET_PACKET_ERROR_CODE(packet)?-1:0;
 }
 
-int cifs_packet_error(char *packet) {
+int cifs_packet_errno(char *packet) {
 	switch (GET_PACKET_ERROR_CLASS(packet)) {
 		case 0:
 			return 0;
@@ -219,7 +228,6 @@ int cifs_send(cifs_connect_p c) {
 	return 0;
 }
 
-
 int cifs_recv_skip_sock(int sock, int size) {
 	unsigned char buf;
 	int res;
@@ -352,11 +360,6 @@ int cifs_recv(cifs_connect_p c) {
 	return 0;
 }
 
-
-int cifs_recv_more(cifs_connect_p c) {
-	return cifs_recv(c);
-}
-
 int cifs_request(cifs_connect_p c) {
 	if (cifs_send(c)) return -1;
 	if (cifs_recv(c)) return -1;
@@ -369,8 +372,8 @@ int cifs_request(cifs_connect_p c) {
 		errno = EIO;
 		return -1;
 	}
-	if (cifs_packet_fail(c->i)) {
-		errno = cifs_packet_error(c->i);
+	if (cifs_packet_isfail(c->i)) {
+		errno = cifs_packet_errno(c->i);
 		return -1;
 	}
 	return 0;

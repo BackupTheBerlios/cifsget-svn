@@ -31,24 +31,21 @@ typedef struct cifs_connect_s {
 } cifs_connect_t;
 typedef cifs_connect_t *cifs_connect_p;
 
-int cifs_packet_fail(char *packet);
-
-int cifs_packet_error(char *packet);
+void cifs_log_packet(char *packet);
+int cifs_packet_isfail(char *packet);
+int cifs_packet_errno(char *packet);
 
 int cifs_resolve(const char *host, struct in_addr *addr);
 
+
 int cifs_connect_sock(const struct in_addr *address, int port , const char *local_name, const char *remote_name);
-
 cifs_connect_p cifs_connect_new(int sock, const char *name);
-
 void cifs_connect_close(cifs_connect_p c);
-
 int cifs_connected(cifs_connect_p c);
 
 int cifs_send(cifs_connect_p c);
 int cifs_recv(cifs_connect_p c);
 int cifs_recv_async(cifs_connect_p c);
-int cifs_recv_more(cifs_connect_p c);
 
 size_t cifs_send_raw(cifs_connect_p c, void *buf, size_t len);
 size_t cifs_recv_raw(cifs_connect_p c, void *buf, size_t len);

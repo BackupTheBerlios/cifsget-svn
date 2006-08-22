@@ -1,6 +1,13 @@
 #ifndef FLOW_H
 #define FLOW_H
 
+#include <stdint.h>
+#include <stdlib.h>
+#include <sys/time.h>
+#include <time.h>
+#include <errno.h>
+#include "macros.h"
+
 /* time line: ----- start ------------------------ a ---------- b ----- c -----> */
 
 

@@ -1,4 +1,4 @@
-#include "includes.h"
+#include "uri.h"
 
 #define HEX_TO_INT(c)	((c>='0' && c<='9')?(c-'0'):((c>='A' && c<='F')?(c-'A'+10):((c>='a' && c<='f')?(c-'a'+10):0)))
 

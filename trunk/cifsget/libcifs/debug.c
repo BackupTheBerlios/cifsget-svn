@@ -2,11 +2,14 @@
 
 int cifs_log_level = CIFS_LOG_NORMAL;
 
+FILE *cifs_log_stream = NULL;
+
 int cifs_log_msg(const char *fmt, ...) {
+	if (!cifs_log_stream) return 0;
 	int res;
 	va_list ap;
 	va_start(ap, fmt);
-	res = vfprintf(stderr, fmt, ap);
+	res = vfprintf(cifs_log_stream, fmt, ap);
 	va_end(ap);
 	return res;
 }
@@ -14,6 +17,7 @@ int cifs_log_msg(const char *fmt, ...) {
 int cifs_log_hex(void *buf, int len) {
 	int i, res = 0;
 	char line[16*4+3], *p;
+	if (!cifs_log_stream) return 0;
 	while (len > 0) {
 		p = line;
 		i = 0;
@@ -40,37 +44,15 @@ int cifs_log_hex(void *buf, int len) {
 		*p++ = '\n';
 		res += p - line;
 		*p++ = '\0';
-		fputs(line, stderr);
+		fputs(line, cifs_log_stream);
 		buf += 16;
 		len -= 16;
 	}
 	return res;
 }
 
-void cifs_log_trans(const char *name, cifs_trans_p t) {
-	cifs_log_debug("trans %s setup %d param %d data %d\n", name, t->setup_total, t->param_total, t->data_total);
-	if (cifs_log_level >= CIFS_LOG_NOISY) {
-		cifs_log_msg("setup %d\n", t->setup_total);
-		cifs_log_hex(t->setup, t->setup_total);
-		
-		cifs_log_msg("param %d\n", t->param_total);
-		cifs_log_hex(t->param, t->param_total);
-		
-		cifs_log_msg("data %d\n", t->data_total);
-		cifs_log_hex(t->data, t->data_total);
-	}
-}
-
 void cifs_log_flush(void) {
-	fflush(stderr);
-}
-
-void cifs_log_packet(char *p) {
-	cifs_log_debug("%s command %02X E %d_%d WC %d BC %d\n",
-			(GET_PACKET_FLAGS(p)&FLAG_REPLY)?"In ":"Out",
-			GET_PACKET_COMMAND(p),
-			GET_PACKET_ERROR_CLASS(p), GET_PACKET_ERROR_CODE(p),
-			GET_PACKET_WC(p), GET_PACKET_BC(p));
-	cifs_log_struct_noisy(p, PACKET);
+	if (!cifs_log_stream) return;
+	fflush(cifs_log_stream);
 }
 

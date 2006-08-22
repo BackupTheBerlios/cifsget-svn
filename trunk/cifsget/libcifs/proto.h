@@ -1,5 +1,5 @@
-#ifndef PROTO_H
-#define PROTO_H
+#ifndef CIFS_PROTO_H
+#define CIFS_PROTO_H
 
 time_t cifs_time(int64_t nttime);
 
@@ -24,4 +24,4 @@ size_t cifs_read_get(cifs_connect_p c, void **buf);
 size_t cifs_read_recv(cifs_connect_p c, void *buf, size_t size);	
 size_t cifs_read(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t offset);
 
-#endif /* PROTO_H */
+#endif /* CIFS_PROTO_H */

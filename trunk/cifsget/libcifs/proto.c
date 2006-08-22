@@ -160,12 +160,12 @@ int cifs_tree_connect(cifs_connect_p c, const char *tree) {
 	p = GET_PACKET_W(c->i);
 	cifs_log_struct(p, ITREECONNECT);
 
-	return 0;
+	return tid;
 }
 
 int cifs_tree_switch(cifs_connect_p c, int tid) {
 	int t;
-	t = GET_PACKET_TID(c->i);
+	t = GET_PACKET_TID(c->o);
 	SET_PACKET_TID(c->o, tid);
 	return t;
 }

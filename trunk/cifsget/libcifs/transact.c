@@ -1,5 +1,19 @@
 #include "includes.h"
 
+void cifs_log_trans(const char *name, cifs_trans_p t) {
+	cifs_log_debug("trans %s setup %d param %d data %d\n", name, t->setup_total, t->param_total, t->data_total);
+	if (cifs_log_level >= CIFS_LOG_NOISY) {
+		cifs_log_msg("setup %d\n", t->setup_total);
+		cifs_log_hex(t->setup, t->setup_total);
+		
+		cifs_log_msg("param %d\n", t->param_total);
+		cifs_log_hex(t->param, t->param_total);
+		
+		cifs_log_msg("data %d\n", t->data_total);
+		cifs_log_hex(t->data, t->data_total);
+	}
+}
+
 void cifs_trans_req(cifs_connect_p c, int command, char *name, int setup_count, ...) {
 	char *w, *b, *o = c->o;	
 	va_list st;
@@ -83,8 +97,8 @@ int cifs_trans_recv(cifs_connect_p c, cifs_trans_p t) {
 			return -1;
 		}
 
-		if (cifs_packet_fail(c->i)) {
-			errno = cifs_packet_error(c->i);
+		if (cifs_packet_isfail(c->i)) {
+			errno = cifs_packet_errno(c->i);
 			return -1;
 		}
 
@@ -168,7 +182,7 @@ int cifs_trans_recv(cifs_connect_p c, cifs_trans_p t) {
 		
 		if (t->param_count == t->param_total && t->data_count == t->data_total) break;
 		
-		if(cifs_recv_more(c)) return -1;
+		if(cifs_recv(c)) return -1;
 	} while(1);
 	return 0;
 }
