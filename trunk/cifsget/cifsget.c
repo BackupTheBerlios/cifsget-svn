@@ -484,7 +484,7 @@ int main(int argc, char** argv) {
 				if (uri->name) {
 					cifs_action(action, uri);
 					cifs_uri_free(uri);
-				}
+				}				
 				if (optarg) {
 					cifs_uri_parse(uri, optarg);
 				}

@@ -84,7 +84,8 @@ int cifs_uri_parse(cifs_uri_p uri, const char *str) {
 		a = s;
 	}
 	
-	o = uri->path = malloc(strlen(a) + 2);
+	o = uri->path = malloc(strlen(a) + 2);	
+	o[0] = '\0';
 	for (int i = 0 ; (b = strsep(&a, "/\\")) ; ) {
 		if (!b[0]) continue;		
 		switch (i) {
