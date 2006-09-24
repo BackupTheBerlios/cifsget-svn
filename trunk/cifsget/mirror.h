@@ -3,8 +3,7 @@
 
 typedef struct cifs_mirror_s {
 	cifs_uri_t uri;
-	cifs_connect_p conn;	
-	cifs_dirinfo_t info;
+	cifs_connect_p conn;
 	cifs_flow_t flow;
 	int fid;
 	int fd;

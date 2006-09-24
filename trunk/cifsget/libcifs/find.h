@@ -1,28 +1,36 @@
 #ifndef FIND_H
 #define FIND_H
 
-#define CIFS_MAX_PATH 260
-
-typedef struct cifs_dirinfo_s {
+typedef struct cifs_stat_s {
 	int64_t creation_time;
 	int64_t access_time;
 	int64_t write_time;
 	int64_t change_time;
 	uint64_t file_size;
 	uint64_t allocation_size;
-	int directory;
-	//uint32_t attributes;
-	char name[CIFS_MAX_PATH];
-} cifs_dirinfo_t;
-typedef cifs_dirinfo_t *cifs_dirinfo_p;
+	uint32_t attributes;
+	int is_directory;
+} cifs_stat_t;
+typedef cifs_stat_t *cifs_stat_p;
 
-typedef struct cifs_find_s cifs_find_t;
-typedef cifs_find_t *cifs_find_p;
+typedef struct cifs_dirent_s {
+	cifs_stat_t st;
+	char *name;
+	char *path;
+} cifs_dirent_t;
+typedef cifs_dirent_t *cifs_dirent_p;
 
-cifs_find_p cifs_find_first(cifs_connect_p c, const char *mask);
-int cifs_find_next(cifs_find_p fi, cifs_dirinfo_p di);
-int cifs_find_close(cifs_find_p fi);
+typedef struct cifs_dir_s cifs_dir_t;
+typedef cifs_dir_t *cifs_dir_p;
 
-cifs_dirinfo_p cifs_info(cifs_connect_p c, const char *name);
+cifs_dir_p cifs_find(cifs_connect_p c, const char *path, const char *mask);
+
+cifs_dir_p cifs_opendir(cifs_connect_p c, const char *path);
+
+cifs_dirent_p cifs_readdir(cifs_dir_p dir);
+
+int cifs_closedir(cifs_dir_p dir);
+
+int cifs_stat(cifs_connect_p c, const char *path, cifs_stat_p st);
 
 #endif /* FIND_H */

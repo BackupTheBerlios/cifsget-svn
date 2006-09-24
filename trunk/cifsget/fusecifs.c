@@ -159,7 +159,7 @@ static int fusecifs_list_share(fusecifs_path_p path) {
 		
 	if (!fusecifs_connect_share(host, path)) return -errno;
 	
-	conn = host->conn;	
+	conn = host->conn;
 
 	e = cifs_enum_share(conn);
 	if (!e) return -errno;
@@ -186,7 +186,7 @@ static int fusecifs_list_host(const char *server, const char *workgroup) {
 	cifs_node_t n;	
 
 	c = cifs_connect_tree(server, 0, server, "IPC$");
-	if (!c) return -errno;	
+	if (!c) return -errno;
 	e = cifs_enum_server(c, workgroup);
 	if (!e) {
 		cifs_connect_close(c);
@@ -206,11 +206,11 @@ static int fusecifs_list_host(const char *server, const char *workgroup) {
 	return 0;
 }
 
-static int fusecifs_make_stat (struct stat *st, cifs_dirinfo_p di) {
+static int fusecifs_make_stat (struct stat *st, cifs_stat_p cs) {
 	st->st_dev = 0;
 	st->st_ino = 0;
 	
-	if (di->directory) {
+	if (cs->is_directory) {
 		st->st_mode = S_IFDIR | 0775;
 	} else {
 		st->st_mode = S_IFREG | 0664;
@@ -219,19 +219,19 @@ static int fusecifs_make_stat (struct stat *st, cifs_dirinfo_p di) {
 	st->st_uid = 0;
 	st->st_gid = 0;
 	st->st_rdev = 0;
-	st->st_size = di->file_size;
+	st->st_size = cs->file_size;
 	st->st_blksize = 64*1024;
-	st->st_blocks = (di->file_size + st->st_blksize - 1) / st->st_blksize;
-	st->st_atime = cifs_time(di->access_time);
-	st->st_mtime = cifs_time(di->write_time);
-	st->st_ctime = cifs_time(di->change_time);
+	st->st_blocks = (cs->file_size + st->st_blksize - 1) / st->st_blksize;
+	st->st_atime = cifs_time(cs->access_time);
+	st->st_mtime = cifs_time(cs->write_time);
+	st->st_ctime = cifs_time(cs->change_time);
 	return 0;
 }
 
 static int fusecifs_getattr (const char *path, struct stat *st) {
 	cifs_connect_p conn;
 	fusecifs_path_t p;
-	cifs_dirinfo_p di;
+	cifs_stat_t cs;
 	fusecifs_parse_path(path, &p);
 	if (!p.host || !p.share || !p.path || !p.path[0])  {
 		ZERO_STRUCTP(st);
@@ -239,14 +239,10 @@ static int fusecifs_getattr (const char *path, struct stat *st) {
 		return 0;
 	}
 	conn = fusecifs_connect(&p);
-	if (!conn) goto err;
-	di = cifs_info(conn, p.path);
-	if (!di) goto err;
-	fusecifs_make_stat(st, di);
-	free(di);
-	return 0;
-err:
-	return -errno;
+	if (!conn) return -errno;
+	if (cifs_stat(conn, p.path, &cs)) return -errno;
+	fusecifs_make_stat(st, &cs);
+	return 0;	
 }
 
 static int fusecifs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
@@ -254,8 +250,8 @@ static int fusecifs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	fusecifs_path_t p;
 	cifs_connect_p conn;
 	
-	cifs_find_p fr;
-	cifs_dirinfo_t di;	
+	cifs_dir_p dir;
+	cifs_dirent_p de;
 	struct stat st;
 	
 	fusecifs_host_p host;
@@ -284,16 +280,14 @@ static int fusecifs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	conn = fusecifs_connect(&p);
 	if (!conn) return -errno;
 	
-	char *mask;	
-	asprintf(&mask, "%s/*", p.path);
-	fr = cifs_find_first(conn, mask);
-	free(mask);
-	if (!fr) return -errno;
-	while (!cifs_find_next(fr, &di)) {
-		fusecifs_make_stat(&st, &di);		
-		if (filler(buf, di.name, &st, 0)) return -EIO;
+	dir = cifs_opendir(conn, p.path);
+	if (!dir) return -errno;
+	
+	while ((de = cifs_readdir(dir))) {
+		fusecifs_make_stat(&st, &de->st);
+		if (filler(buf, de->name, &st, 0)) return -EIO;
 	}
-	cifs_find_close(fr);
+	cifs_closedir(dir);
 	return 0;
 }
 

@@ -14,7 +14,7 @@ install: all
 .c.o:
 	${CC} ${CFLAGS} -c -o $@ $<
 
-cifsget: cifsget.o flow.o human.o uri.o
+cifsget: cifsget.o flow.o human.o uri.o libcifs/libcifs.a
 	$(CC) -o $@ $^ -lcifs $(LDFLAGS)
 
 fusecifs: fusecifs.o

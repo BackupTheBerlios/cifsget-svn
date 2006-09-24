@@ -7,13 +7,24 @@ typedef unsigned int uint_t;
 
 #define NEW_STRUCT(x) x = calloc(1, sizeof(*(x)))
 #define FREE_STRUCT(x) do { free(x); x = NULL; } while(0)
+#define ALLOC_STRUCT(t) (t*)calloc(1, sizeof(t))
 
-static inline char *cifs_write_string(char *p, const char *s) {
-	do {
-		*p++=*s;
-	} while (*s++);
-	return p;
+static inline void cifs_write_buf(char **p, const char *s) {
+	while (*s) {
+		*(*p)++ = *s++;
+	}
 }
+
+static inline void cifs_write_string(char **p, const char *s) {
+	do {
+		*(*p)++ = *s;
+	} while (*s++);
+}
+
+#define WRITE_BUF(p, s) cifs_write_buf(&p, s)
+#define WRITE_STRING(p, s) cifs_write_string(&p, s)
+#define WRITE_FORMAT(p, s, ...) (p+=sprintf(p, s, __VA_ARGS__)+1)
+
 
 static inline char *cifs_read_string(char **p) {
 	int len = strlen(*p);
@@ -37,8 +48,6 @@ static inline char *cifs_read_string(char **p) {
 #define READ_BE_SIGNED_WORD(p)	(RSVALS(p, 0),p+=2)
 #define READ_BE_SIGNED_LONG(p)	(RIVALS(p, 0),p+=4)
 
-#define WRITE_STRING(p, s) (p=cifs_write_string(p, s))
-#define WRITE_FORMAT(p, s, ...) (p+=sprintf(p, s, __VA_ARGS__)+1)
 
 #define WRITE_BYTE(p, v) (SCVAL(p, 0, v),p+=1)
 #define WRITE_WORD(p, v) (SSVAL(p, 0, v),p+=2)

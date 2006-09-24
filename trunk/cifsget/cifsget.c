@@ -34,8 +34,8 @@ usage: cifsget OPTION | URI | UNC | SHORT ...\n\
 cifs_flow_p flow;
 int opt_dirsize = 0;
 
-void cifs_print_file(cifs_dirinfo_p di) {
-	printf("%6s %s%s\n", (!di->directory || opt_dirsize) ? cifs_hsize(di->file_size, NULL) : " <dir>" , di->name, di->directory ? "/":"");
+void cifs_print_file(cifs_dirent_p st) {
+	printf("%6s %s%s\n", (!st->st.is_directory || opt_dirsize) ? cifs_hsize(st->st.file_size, NULL) : " <dir>" , st->name, st->st.is_directory ? "/":"");
 }
 
 int cifs_print_node(cifs_node_p n) {
@@ -73,44 +73,35 @@ int cifs_print_status(const char *fmt, ...) {
 }
 
 int cifs_get_size_dir(cifs_connect_p c, const char *path, const char *name, uint64_t *size) {
-	cifs_find_p fi;
-	cifs_dirinfo_t di;
-	char *mask;
-	
+	cifs_dir_p d;
+	cifs_dirent_p e;
 	
 	if (cifs_log_level >= CIFS_LOG_NORMAL) {
 		cifs_print_status("%6s %s", cifs_hsize(*size, NULL), name);
 	}
+
+	d = cifs_opendir(c, path);
+	if (!d) return -1;
 	
-	asprintf(&mask, "%s/*", path);
-	fi = cifs_find_first(c, mask);
-	if (!fi) {
-		free(mask);
-		return -1;
-	}
-	free(mask);	
-	
-	while (!cifs_find_next(fi, &di)) {
-		if (di.directory) {
-			char *pt, *nm;
-			asprintf(&pt, "%s/%s", path, di.name);
-			asprintf(&nm, "%s/%s", name, di.name);
-			cifs_get_size_dir(c, pt, nm, size);
-			free(pt);
+	while ((e = cifs_readdir(d))) {
+		if (e->st.is_directory) {
+			char *nm;
+			asprintf(&nm, "%s/%s", name, e->name);
+			cifs_get_size_dir(c, e->path, nm, size);
 			free(nm);
 		} else {
-			*size += di.file_size;
+			*size += e->st.file_size;
 		}
 	}
 	
-	cifs_find_close(fi);
+	cifs_closedir(d);
 	
 	return 0;
 }
 
-int cifs_calc_size(cifs_connect_p c, const char *path, cifs_dirinfo_p di) {
-	if (di->directory) {
-		cifs_get_size_dir(c, path,  di->name, &di->file_size);
+int cifs_calc_size(cifs_connect_p c, cifs_dirent_p e) {
+	if (e->st.is_directory) {
+		cifs_get_size_dir(c, e->path,  e->name, &e->st.file_size);
 		if (cifs_log_level >= CIFS_LOG_NORMAL) {
 			cifs_print_status("");
 		}
@@ -118,7 +109,7 @@ int cifs_calc_size(cifs_connect_p c, const char *path, cifs_dirinfo_p di) {
 	return 0;
 }
 
-int cifs_download_file(cifs_connect_p c, cifs_dirinfo_p di, const char *src, const char *dst) {
+int cifs_download_file(cifs_connect_p c, cifs_dirent_p e, const char *dst) {
 	int fid = -1;
 	int fd = -1;
 	static char buf[64*1024];
@@ -130,9 +121,9 @@ int cifs_download_file(cifs_connect_p c, cifs_dirinfo_p di, const char *src, con
 		return -1;
 	}
 	
-	fid = cifs_open(c, src, O_RDONLY);
+	fid = cifs_open(c, e->path, O_RDONLY);
 	if (fid < 0) {
-		perror(src);
+		perror(e->path);
 		goto err;
 	}
 	
@@ -148,17 +139,17 @@ int cifs_download_file(cifs_connect_p c, cifs_dirinfo_p di, const char *src, con
 		goto err;
 	}
 
-	rem = di->file_size - off;
+	rem = e->st.file_size - off;
 
 	char size_str[10];
 
-	cifs_hsize(di->file_size, size_str);
+	cifs_hsize(e->st.file_size, size_str);
 
 	while (rem > 0) {
 		len  = (rem < sizeof(buf))?rem:sizeof(buf);
 		res = cifs_read(c, fid, buf, len, off);
 		if (res < 0) {
-			perror(src);
+			perror(e->path);
 			goto err;
 		}
 		if (res > 0) {			
@@ -174,7 +165,7 @@ int cifs_download_file(cifs_connect_p c, cifs_dirinfo_p di, const char *src, con
 			cifs_print_status("%6s of %6s (%.1f%%) %6s/s ETA: %s ", 
 					cifs_hsize(off, NULL), 
 					size_str,
-					(double)off * 100.0 / di->file_size, 
+					(double)off * 100.0 / e->st.file_size, 
 					cifs_hsize(flow->speed, speed_str), 
 					flow->speed > 0 ? cifs_htime(rem / flow->speed) : "???");
 		}
@@ -192,10 +183,10 @@ err:
 	return -1;
 }
 
-int cifs_download_dir(cifs_connect_p c, const char *src, const char *dst) {
-	char *mask = NULL, *sname, *dname;
-	cifs_dirinfo_t di;
-	cifs_find_p fi;
+int cifs_download_dir(cifs_connect_p c, cifs_dirent_p src, const char *dst) {
+	char *dname;
+	cifs_dir_p d;	
+	cifs_dirent_p e;
 	int res = -1;
 
 	if (!cifs_connected(c)) {
@@ -206,76 +197,66 @@ int cifs_download_dir(cifs_connect_p c, const char *src, const char *dst) {
 	if (mkdir(dst, 0755) && errno != EEXIST) {
 		perror(dst);
 		goto err;
-	}	
-	asprintf(&mask, "%s/*", src);
-		
-	fi = cifs_find_first(c, mask);
+	}
 	
-	if (!fi) {
-		perror(src);
+	d = cifs_opendir(c, src->path);
+	
+	if (!d) {
+		perror(src->path);
 		return -1;
 	}
 	
-	while (!cifs_find_next(fi, &di)) {
-		asprintf(&sname, "%s/%s", src, di.name);
-		asprintf(&dname, "%s/%s", dst, di.name);
+	while ((e = cifs_readdir(d))) {
+		asprintf(&dname, "%s/%s", dst, e->name);
 		
-		cifs_print_file(&di);
+		cifs_print_file(e);
 		
-		if (di.directory) {
-			if (cifs_download_dir(c, sname, dname)) {
-				perror(sname);
+		if (e->st.is_directory) {
+			if (cifs_download_dir(c, e, dname)) {
+				perror(e->path);
 				if (!cifs_connected(c)) {
 					errno = ENOTCONN;
 					goto err;
 				}
 			}			
 		} else {
-			if (cifs_download_file(c, &di, sname, dname)) {
-				perror(sname);
+			if (cifs_download_file(c, e, dname)) {
+				perror(e->path);
 				if (!cifs_connected(c)) {
 					errno = ENOTCONN;
 					goto err;
 				}
 			}
 		}
-		free(sname);
 		free(dname);
 	}
 	res = 0;
 err:
-	cifs_find_close(fi);
-	free(mask);
+	cifs_closedir(d);
 	return res;
 }
 
 int cifs_list_dir(cifs_connect_p c, const char *path) {
-	char *mask;
-	cifs_dirinfo_t di;
-	cifs_find_p fi;
+	cifs_dirent_p e;
+	cifs_dir_p d;
 	uint64_t total = 0;
-	asprintf(&mask, "%s/*", path);
+
+	d = cifs_opendir(c, path);
 	
-	fi = cifs_find_first(c, mask);
-	
-	if (!fi) {
+	if (!d) {
 		perror(path);
 		return -1;
 	}
 	
-	while (!cifs_find_next(fi, &di)) {
-		if (di.directory && opt_dirsize) {
-			char *pt;
-			asprintf(&pt, "%s/%s", path, di.name);
-			cifs_calc_size(c, pt, &di);
-			free(pt);
+	while ((e = cifs_readdir(d))) {
+		if (e->st.is_directory && opt_dirsize) {
+			cifs_calc_size(c, e);
 		}
-		cifs_print_file(&di);
-		total += di.file_size;
+		cifs_print_file(e);
+		total += e->st.file_size;
 	}
-	cifs_find_close(fi);
+	cifs_closedir(d);
 	cifs_log_normal("total: %s\n", cifs_hsize(total, NULL));
-	free(mask);
 	return 0;
 }
 
@@ -330,11 +311,11 @@ int cifs_list_node(cifs_connect_p c) {
 	return 0;
 }
 
-int cifs_list(cifs_connect_p c, const char *path, cifs_dirinfo_p di) {	
-	if (path) {
-		if (di->directory) {
+int cifs_list(cifs_connect_p c, cifs_dirent_p di) {	
+	if (di) {
+		if (di->st.is_directory) {
 			cifs_log_normal("%s:\n", di->name);
-			cifs_list_dir(c, path);
+			cifs_list_dir(c, di->path);
 			cifs_log_normal("\n");
 		} else {
 			cifs_print_file(di);
@@ -347,11 +328,11 @@ int cifs_list(cifs_connect_p c, const char *path, cifs_dirinfo_p di) {
 
 char *outfile = NULL, *outdir = ".";
 
-int cifs_download(cifs_connect_p c, const char *path, cifs_dirinfo_p di) {
+int cifs_download(cifs_connect_p c, cifs_dirent_p de) {
 	char *dst;
 			
 	if (!outfile) {
-		asprintf(&dst, "%s/%s", outdir, di->name);
+		asprintf(&dst, "%s/%s", outdir, de->name);
 	} else {
 		if (outfile[0] == '/') {
 			dst = strdup(outfile);
@@ -360,12 +341,12 @@ int cifs_download(cifs_connect_p c, const char *path, cifs_dirinfo_p di) {
 		}
 	}
 	
-	cifs_print_file(di);
+	cifs_print_file(de);
 	
-	if (di->directory) {
-		cifs_download_dir(c, path, dst);
+	if (de->st.is_directory) {
+		cifs_download_dir(c, de, dst);
 	} else {
-		cifs_download_file(c, di, path, dst);
+		cifs_download_file(c, de, dst);
 	}		
 
 	free(dst);
@@ -376,8 +357,8 @@ int cifs_download(cifs_connect_p c, const char *path, cifs_dirinfo_p di) {
 
 int cifs_action(int action, cifs_uri_p uri) {
 	cifs_connect_p c;
-	cifs_find_p fi;
-	cifs_dirinfo_t di;
+	cifs_dir_p dir;
+	cifs_dirent_p de;
 	if (uri->tree) {
 		c = cifs_connect_tree(uri->addr, uri->port, uri->name, uri->tree);
 		if (!c) {
@@ -386,35 +367,35 @@ int cifs_action(int action, cifs_uri_p uri) {
 		}
 		if (uri->path && uri->path[0]) {
 			if (!c) return -1;
-			fi = cifs_find_first(c, uri->path);
-			if (!fi) {
+			dir = cifs_find(c, uri->dir, uri->file);
+			if (!dir) {
 				perror(uri->path);
 				cifs_connect_close(c);
 				return -1;
 			}
-			while (!cifs_find_next(fi, &di)) {
-				char *path;
-				asprintf(&path, "%s/%s", uri->dir, di.name);
+			while ((de = cifs_readdir(dir))) {
 				switch (action) {
 					case 'd':
-						cifs_download(c, path, &di);
+						cifs_download(c, de);
 						break;
 					case 'l':
-						cifs_list(c, path, &di);
+						cifs_list(c, de);
 						break;
 				}
 			}
-			cifs_find_close(fi);
+			cifs_closedir(dir);
 		} else {
-			memset(&di, 0, sizeof(di));
-			di.directory = 1;
-			strncpy(di.name, uri->tree, sizeof(di.name));
+			cifs_dirent_t d;
+			ZERO_STRUCT(d);
+			d.st.is_directory = 1;
+			d.name = uri->tree;
+			d.path = "";
 			switch (action) {
 				case 'd':
-					cifs_download(c, "", &di);
+					cifs_download(c, &d);
 					break;
 				case 'l':
-					cifs_list(c, "", &di);
+					cifs_list(c, &d);
 					break;
 			}
 		}
@@ -426,7 +407,7 @@ int cifs_action(int action, cifs_uri_p uri) {
 		}
 		switch (action) {
 			case 'l':
-				cifs_list(c, NULL, NULL);
+				cifs_list(c, NULL);
 				break;
 		}
 	}
