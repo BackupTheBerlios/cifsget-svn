@@ -148,7 +148,8 @@ cifs_dir_p cifs_find(cifs_connect_p c, const char *path, const char *mask) {
 	d->de.path = d->buf;
 	char *p = d->buf;
 	WRITE_BUF(p, path);
-	WRITE_STRING(p, "/");
+	WRITE_BUF(p, "/");
+	*p = '\0';
 	d->de.name = p;
 	
 	return d;
