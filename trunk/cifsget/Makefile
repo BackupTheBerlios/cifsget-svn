@@ -3,7 +3,7 @@ LDFLAGS=-Llibcifs
 SRCS=flow.c human.c uri.c cifsget.c fusecifs.c
 PREFIX=${HOME}
 
-all: libs cifsget fusecifs
+all: libs cifsget
 
 libs:
 	make -C libcifs
@@ -15,6 +15,9 @@ install: all
 	${CC} ${CFLAGS} -c -o $@ $<
 
 cifsget: cifsget.o flow.o human.o uri.o libcifs/libcifs.a
+	$(CC) -o $@ $^ -lcifs $(LDFLAGS)
+	
+cifs_spider: cifs_spider.o uri.o libcifs/libcifs.a
 	$(CC) -o $@ $^ -lcifs $(LDFLAGS)
 
 fusecifs: fusecifs.o
