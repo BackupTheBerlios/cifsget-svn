@@ -3,7 +3,7 @@
 #include <iconv.h>
 
 //const char *cifs_cp_sys = "ASCII";
-const char *cifs_cp_sys = "CP1251";
+const char *cifs_cp_sys = "UTF-8";
 const char *cifs_cp_oem = "866";
 const char *cifs_cp_ucs = "UCS-2LE";
 
