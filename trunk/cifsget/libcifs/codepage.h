@@ -24,4 +24,3 @@ void cifs_cp_init(void);
 #define WRITE_STRING_UCS(p,l,s) do { cifs_cp_write(cifs_cp_sys_to_ucs, &p, l, s); WRITE_WORD(p, 0); } while(0)
 
 #endif
-

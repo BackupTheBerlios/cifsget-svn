@@ -8,12 +8,7 @@
 #define CIFS_TRANS_MAX_DATA_COUNT (60*1024)
 
 typedef struct cifs_trans_s {
-	char *setup;
-	char *param;
-	char *data;
-	size_t setup_count, setup_total;
-	size_t param_count, param_total;
-	size_t data_count, data_total;
+    cifs_buf_p setup, param, data;
 } cifs_trans_t;
 typedef cifs_trans_t *cifs_trans_p;
 

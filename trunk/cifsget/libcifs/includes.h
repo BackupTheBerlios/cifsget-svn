@@ -35,6 +35,9 @@
 #include <sys/time.h>
 #include <time.h>
 
+#include "buffer.h"
+#include "struct.h"
+
 #include "transport.h"
 #include "proto.h"
 
@@ -50,8 +53,6 @@
 #include "doserr.h"
 #include "byteorder.h"
 
-#include "atom.h"
-#include "struct.h"
 #include "codepage.h"
 
 #endif

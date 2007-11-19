@@ -7,7 +7,6 @@
 #include "flow.h"
 #include "mirror.h"
 #include "human.h"
-#include "macros.h"
 
 void usage() {
 	fprintf(stderr, "\
@@ -28,6 +27,7 @@ usage: cifsget OPTION | URI | UNC | SHORT ...\n\
   -d [0-6]              debug level, default - 3\n\
   -i ip                 destination ip\n\
   -p port               destination port\n\
+  -P file               PUT\n\
 ");
 }
 
@@ -397,6 +397,98 @@ int cifs_list_uri(cifs_uri_p uri) {
 	return 0;
 }
 
+char *putname = NULL;
+
+
+int cifs_upload_file(cifs_connect_p c, const char *src, cifs_dirent_p dst) {
+	int fid = -1;
+	int fd = -1;
+	static char buf[64*1024];
+	int res, len;
+	off_t off, rem, size;
+
+	if (!cifs_connected(c)) {
+		errno = ENOTCONN;
+		return -1;
+	}
+	
+	fid = cifs_open(c, dst->path, O_WRONLY);
+	if (fid < 0) {
+		perror(dst->path);
+		goto err;
+	}
+	
+	fd = open(src, O_RDONLY | O_LARGEFILE);
+	if (fd < 0) {
+		perror(src);
+		goto err;
+	}
+	
+	size = lseek(fd, 0, SEEK_END);   
+	if (size == (off_t)-1) {
+		perror(src);
+		goto err;
+	}
+
+	rem = size - dst->st.file_size;
+
+	char size_str[10];
+
+    off = dst->st.file_size;
+
+	cifs_hsize(off, size_str);
+
+	while (rem > 0) {
+		len = rem;
+        if (len > sizeof(buf)) {
+            len = sizeof(buf);
+        }
+        len = read(fd, buf, len);
+   		if (len < 0) {
+			perror(src);
+			goto err;
+		}
+        res = cifs_write(c, fid, buf, len, off);
+        if (res < 0) {
+    		perror(dst->path);
+	    	goto err;
+        }
+		if (res > 0) {
+			off += res;
+			rem -= res;
+		}
+		if (cifs_flow(flow, res) && cifs_log_level >= CIFS_LOG_NORMAL) {
+			char speed_str[10];
+			cifs_print_status("%6s of %6s (%.1f%%) %6s/s ETA: %s ", 
+					cifs_hsize(off, NULL), 
+					size_str,
+					(double)off * 100.0 / size,
+					cifs_hsize(flow->speed, speed_str), 
+					flow->speed > 0 ? cifs_htime(rem / flow->speed) : "???");
+		}
+	}
+	if (cifs_log_level >= CIFS_LOG_NORMAL) {
+		cifs_print_status("");
+	}
+	close(fd);
+	cifs_close(c, fid);
+	return 0;
+
+err:
+	if (fid > 0) cifs_close(c, fid);
+	if (fd > 0) close(fd);
+	return -1;
+}
+
+
+int cifs_upload(cifs_connect_p c, cifs_dirent_p de) {
+    asprintf(&de->path, "%s/%s", de->path, putname);
+    cifs_upload_file(c, putname, de);
+    free(putname);
+	putname = NULL;
+	return 0;
+}
+
 int cifs_action(int action, cifs_uri_p uri) {
 	cifs_connect_p c;
 	cifs_dir_p dir;
@@ -423,6 +515,9 @@ int cifs_action(int action, cifs_uri_p uri) {
 					case 'l':
 						cifs_list(c, de);
 						break;
+                    case 'p':
+                        cifs_upload(c, de);
+                        break;
 				}
 			}
 			cifs_closedir(dir);
@@ -439,6 +534,9 @@ int cifs_action(int action, cifs_uri_p uri) {
 				case 'l':
 					cifs_list(c, &d);
 					break;
+                case 'p':
+                    cifs_upload(c, &d);
+                    break;
 			}
 		}
 	} else {
@@ -476,7 +574,7 @@ int main(int argc, char** argv) {
 	cifs_log_stream = stderr;
 	
 	do {
-		opt = getopt(argc, argv, "-ls:o:O:d:i:p:hS");
+		opt = getopt(argc, argv, "-ls:o:O:d:i:p:P:hS");
 		switch (opt) {
 			case 'd':
 				cifs_log_level = atoi(optarg);
@@ -503,12 +601,16 @@ int main(int argc, char** argv) {
 			case 'p':
 				uri->port = atoi(optarg);
 				break;
+            case 'P':
+                action = 'p';
+                putname = strdup(optarg);
+                break;
 			case -1:
 			case 1:
 				if (uri->name) {
 					cifs_action(action, uri);
 					cifs_uri_free(uri);
-				}				
+				}
 				if (optarg) {
 					cifs_uri_parse(uri, optarg);
 				}

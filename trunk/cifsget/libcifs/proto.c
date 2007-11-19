@@ -1,5 +1,7 @@
 #include "includes.h"
 
+#include "struct2.h"
+
 time_t cifs_time(int64_t nttime) {
 	return (time_t)(((nttime)/10000000) - 11644473600);
 }
@@ -13,190 +15,116 @@ void cifs_path_fix_ucs (char *path) {
 }
 
 int cifs_negotiate(cifs_connect_p c) {
-	char *o=c->o, *p;
+    cifs_packet_p i = c->i;
+    cifs_packet_p o = c->o;
+    ZERO_STRUCTP(o->h);
+    WORDS_STRUCT(i, cifs_negotiate_res_s, res);
+    cifs_packet_setup(o, SMBnegprot, 0);
+    strncpy(o->h->magic, "\xFFSMB", 4);
+    o->h->flags = FLAG_CANONICAL_PATHNAMES | FLAG_CASELESS_PATHNAMES;
+    o->h->flags2 = FLAGS2_LONG_PATH_COMPONENTS | FLAGS2_IS_LONG_NAME;
+    o->h->tid = -1;
+    cifs_write_oemz(o->b, "\x02NT LM 0.12");
 
-	SET_PACKET_TYPE(o, 0);
-	SET_PACKET_ZERO(o, 0);
+    if (cifs_request(c)) return -1;
 
-	SET_PACKET_MAGIC(o, CIFS_MAGIC);
-	SET_PACKET_COMMAND(o, SMBnegprot);
+    c->session_key = res->session_key;
 	
-	SET_PACKET_ERROR_CLASS(o, 0);
-	SET_PACKET_RESERVED(o, 0);
-	SET_PACKET_ERROR_CODE(o, 0);
-	
-	SET_PACKET_FLAGS(o, FLAG_CANONICAL_PATHNAMES | FLAG_CASELESS_PATHNAMES);
-	SET_PACKET_FLAGS2(o, FLAGS2_LONG_PATH_COMPONENTS | FLAGS2_IS_LONG_NAME);
-	SET_PACKET_PIDH(o, 0);
-	SET_PACKET_SIGNATURE(o, 0ll);
-	SET_PACKET_UNUSED(o, 0);
-	SET_PACKET_TID(o, -1);
-	SET_PACKET_PID(o, 0);
-	SET_PACKET_UID(o, 0);
-	SET_PACKET_MID(o, 0);
-
-	SETLEN_PACKET_W(o, 0);
-	
-	p = PTR_PACKET_B(o);
-	WRITE_STRING(p, "\x02NT LM 0.12");
-	END_PACKET_B(o, p);
-	
-	if (cifs_request(c)) return -1;
-	
-	p = GET_PACKET_W(c->i);
-	c->session_key = GET_INEGOT_SESSIONKEY(p);
-	
-	c->max_buffer_size = GET_INEGOT_MAXBUFFERSIZE(p);
+	c->max_buffer_size = res->max_buffer_size;
 	if (c->max_buffer_size > CIFS_MAX_BUFFER) c->max_buffer_size = CIFS_MAX_BUFFER;
 	
-	c->max_raw_size = GET_INEGOT_MAXRAWSIZE(p);
+	c->max_raw_size = res->max_raw_size;
 	if (c->max_raw_size > CIFS_MAX_RAW) c->max_raw_size = CIFS_MAX_RAW;
 	
-	c->capabilities = GET_INEGOT_CAPABILITIES(p);
+	c->capabilities = res->capabilities;
 
-	c->time = cifs_time(GET_INEGOT_TIME(p));
-	c->zone = GET_INEGOT_ZONE(p) * 60;
+	c->time = res->time;
+	c->zone = res->zone * 60;
 
 	cifs_log_verbose("server zone: UTC %+d time: %s\n", c->zone/3600, ctime(&c->time));
 
 	//c->capabilities &= !CAP_UNICODE;
 	
 	if (c->capabilities & CAP_UNICODE) {
-		SET_PACKET_FLAGS2(o, GET_PACKET_FLAGS2(o) | FLAGS2_UNICODE_STRINGS);
+        o->h->flags2 |= FLAGS2_UNICODE_STRINGS;
 	}
-
-	cifs_log_struct(p, INEGOT);
-
-	return 0;
+    return 0;
 }
 
 int cifs_sessionsetup(cifs_connect_p c) {
-	char *o=c->o, *p;
+    REQUEST_SETUP(SMBsesssetupX, session_setup, 0);
+    req->andx.cmd = -1;
+    req->max_buffer_size = CIFS_MAX_BUFFER;
+    req->max_mpx_count = 1;
+    req->session_key = c->session_key;
+    req->capabilities = c->capabilities & (CAP_RAW_MODE | CAP_LARGE_FILES | CAP_UNICODE);
 	
-	SET_PACKET_COMMAND(o, SMBsesssetupX);
-	
-	p = GET_PACKET_W(o);
-	SETLEN_PACKET_W(o, LEN_OSESSIONSETUP(p));
-
-	SET_OSESSIONSETUP_ANDX(p, 0xFF);
-	SET_OSESSIONSETUP_MAXBUFFERSIZE(p, CIFS_MAX_BUFFER);
-	SET_OSESSIONSETUP_MAXMPXCOUNT(p, 1);
-	SET_OSESSIONSETUP_VCNUMBER(p, 0);
-	SET_OSESSIONSETUP_SESSIONKEY(p, c->session_key);
-	SET_OSESSIONSETUP_IPWDLEN(p, 0);
-	SET_OSESSIONSETUP_PWDLEN(p, 0);
-	SET_OSESSIONSETUP_RESERVED(p, 0);
-	SET_OSESSIONSETUP_CAPABILITIES(p, c->capabilities & (CAP_RAW_MODE | CAP_LARGE_FILES | CAP_UNICODE));
-
-	cifs_log_struct(p, OSESSIONSETUP);
-		
-	p = PTR_PACKET_B(o);
-
 	if (c->capabilities & CAP_UNICODE) {
-		WRITE_ALIGN(p, c->o, 2);
-		WRITE_STRING_UCS(p, c->o_end, "GUEST");
-		WRITE_STRING_UCS(p, c->o_end, "");
-		WRITE_STRING_UCS(p, c->o_end, "LINUX");
-		WRITE_STRING_UCS(p, c->o_end, "LIBCIFS");
+        cifs_write_align(o->b, 2);
+        cifs_write_ucsz(o->b, "GUEST");
+        cifs_write_ucsz(o->b, "");
+        cifs_write_ucsz(o->b, "LINUX");
+        cifs_write_ucsz(o->b, "LIBCIFS");
 	} else {
-		WRITE_STRING_OEM(p, c->o_end, "GUEST");
-		WRITE_STRING_OEM(p, c->o_end, "");
-		WRITE_STRING_OEM(p, c->o_end, "LINUX");
-		WRITE_STRING_OEM(p, c->o_end, "LIBCIFS");
+        cifs_write_oemz(o->b, "GUEST");
+        cifs_write_oemz(o->b, "");
+        cifs_write_oemz(o->b, "LINUX");
+        cifs_write_oemz(o->b, "LIBCIFS");
 	}
-
-	END_PACKET_B(o, p);
-
-	if (cifs_request(c)) return -1;
-
-	p = GET_PACKET_W(c->i);
-	cifs_log_struct(p, ISESSIONSETUP);
-
-	SET_PACKET_UID(c->o, GET_PACKET_UID(c->i));
+    
+	if (cifs_request(c)) return -1;   
+    o->h->uid = c->i->h->uid;
 	return 0;
 }
 
 
 int cifs_tree_connect(cifs_connect_p c, const char *tree) {
-	char *o=c->o, *p;
-	int tid;
-	
-	SET_PACKET_COMMAND(o, SMBtconX);
-	
-	SET_PACKET_TID(o, -1);
-		
-	p = GET_PACKET_W(o);
-	SETLEN_PACKET_W(o, LEN_OTREECONNECT(p));
-	SET_OTREECONNECT_ANDX(p, 0xFF);
-	SET_OTREECONNECT_FLAGS(p, 0);
-	SET_OTREECONNECT_PWDLEN(p, 0);
-
-
-	cifs_log_struct(p, OTREECONNECT);
-
-	p = GET_PACKET_B(o);
+    REQUEST_SETUP(SMBtconX, tree_connect, 0);
+    o->h->tid = -1;
+    req->andx.cmd = -1;
 	if (c->capabilities & CAP_UNICODE) {
-		WRITE_ALIGN(p, c->o, 2);
-		WRITE_BUF_UCS(p, c->o_end, "\\\\");
-		WRITE_BUF_UCS(p, c->o_end, c->name);
-		WRITE_BUF_UCS(p, c->o_end, "\\");
-		WRITE_STRING_UCS(p, c->o_end, tree);
+//        cifs_write_align(o->b, 2);
+        cifs_write_byte(o->b, 0);
+        cifs_write_ucs(o->b, "\\\\");
+		cifs_write_ucs(o->b, c->name);
+		cifs_write_ucs(o->b, "\\");
+		cifs_write_ucsz(o->b,  tree);
 	} else {
-		WRITE_BUF_OEM(p, c->o_end, "\\\\");
-		WRITE_BUF_OEM(p, c->o_end, c->name);
-		WRITE_BUF_OEM(p, c->o_end, "\\");
-		WRITE_STRING_OEM(p, c->o_end, tree);
+        cifs_write_oem(o->b, "\\\\");
+		cifs_write_oem(o->b, c->name);
+		cifs_write_oem(o->b, "\\");
+		cifs_write_oemz(o->b,  tree);
 	}
-	WRITE_STRING(p, "?????");
-	END_PACKET_B(o, p);
+    cifs_write_strz(o->b, "?????");
 	
 	if (cifs_request(c)) return -1;
-	
-	tid = GET_PACKET_TID(c->i);
-	
-	SET_PACKET_TID(c->o, tid);
-	
 
-	p = GET_PACKET_W(c->i);
-	cifs_log_struct(p, ITREECONNECT);
+    o->h->tid = c->i->h->tid;
 
-	return tid;
+	return o->h->tid;
 }
 
 int cifs_tree_switch(cifs_connect_p c, int tid) {
 	int t;
-	t = GET_PACKET_TID(c->o);
-	SET_PACKET_TID(c->o, tid);
+	t = c->o->h->tid;
+    c->o->h->tid = tid;
 	return t;
 }
 
 
 int cifs_tree_disconnect(cifs_connect_p c, int tid) {
-	char *o=c->o;
-	
-	if (tid >= 0) SET_PACKET_TID(o, tid);
-	
-	SET_PACKET_COMMAND(o, SMBtdis);
-		
-	SETLEN_PACKET_W(o, 0);
-	SETLEN_PACKET_B(o, 0);
-	
+    cifs_packet_setup(c->o, SMBtdis, 0);
+    if (tid >= 0) c->o->h->tid = tid;
 	if (cifs_request(c)) return -1;
-	
-	SET_PACKET_TID(o, -1);
-
+    c->o->h->tid = -1;
 	return 0;
 }
 
 int cifs_open(cifs_connect_p c, const char *name, int flags) {
-	char *o = c->o, *p;
+    cifs_packet_setup(c->o, SMBopen, 4);
 
-	int mode = 0;
-	
-	SET_PACKET_COMMAND(o, SMBopen);
-			
-	p = PTR_PACKET_W(o);
-	
+	int mode = 0;	
+		
 	if (flags & O_RDWR) {
 		mode |= OPEN_FLAGS_OPEN_RDWR;
 	} else if (flags & O_WRONLY) {
@@ -204,13 +132,74 @@ int cifs_open(cifs_connect_p c, const char *name, int flags) {
 	} else {
 		mode |= OPEN_FLAGS_OPEN_READ;
 	}
+
+    c->o->h->w[0] = mode;	
+    c->o->h->w[1] = 0x37;
+
+    cifs_write_byte(c->o->b, '\x04');
 	
-	WRITE_WORD(p, mode);
-	WRITE_WORD(p, 0x37);
-	END_PACKET_W(o, p);
+	if (c->capabilities & CAP_UNICODE) {
+        cifs_write_align(c->o->b, 2);
+        cifs_write_ucsz(c->o->b, name);
+	} else {
+        cifs_write_oem(c->o->b, name);
+	}
+    cifs_path_fix_ucs(c->o->b->b);
+	if (cifs_request(c)) return -1;
+	return c->i->h->w[0];
+}
+/*
+int cifs_ntopen(cifs_connect_p c, const char *name, int flags) {
+	char *o = c->o, *w;
+
+	SET_PACKET_COMMAND(o, SMBntcreateX);
+			
+	w = PTR_PACKET_W(o);
+    SETLEN_PACKET_W(o, LEN_ONTCREATEX(w));
+    SET_ONTCREATEX_ANDX(w, 0xFF);
+    SET_ONTCREATEX_RESERVED(w, 0);
+    if (flags & O_DIRECTORY) {
+        SET_ONTCREATEX_FLAGS(w, NTCREATEX_FLAGS_OPEN_DIRECTORY);
+    } else {
+        SET_ONTCREATEX_FLAGS(w, 0);
+    }
+    SET_ONTCREATEX_ROOT_FID(w, 0);
+    if (flags & O_RDWR) {
+        SET_ONTCREATEX_ACCESS(w, FILE_GENERIC_READ | FILE_GENERIC_WRITE);
+	} else if (flags & O_WRONLY) {
+        SET_ONTCREATEX_ACCESS(w, FILE_GENERIC_WRITE);
+	} else {
+        SET_ONTCREATEX_ACCESS(w, FILE_GENERIC_READ);
+	}   
+    SET_ONTCREATEX_ALLOCATION_SIZE(w, 0);
+    SET_ONTCREATEX_EXT_FILE_ATTRIBUTES(w, 0);
+    SET_ONTCREATEX_SHARE_ACCESS(w, NTCREATEX_SHARE_ACCESS_READ | NTCREATEX_SHARE_ACCESS_WRITE | NTCREATEX_SHARE_ACCESS_DELETE);  
+
+    if (flags & O_CREAT) {
+        if (flags & O_EXCL) {
+            SET_ONTCREATEX_DISPOSITION(w, NTCREATEX_DISP_CREATE);
+        } else {
+            if (flags & O_TRUNC) {
+                SET_ONTCREATEX_DISPOSITION(w, NTCREATEX_DISP_OVERWRITE_IF);
+            } else {
+                SET_ONTCREATEX_DISPOSITION(w, NTCREATEX_DISP_OPEN_IF);
+            }
+        }
+    } else {
+        if (flags & O_TRUNC) {
+            SET_ONTCREATEX_DISPOSITION(w, NTCREATEX_DISP_OVERWRITE);
+        } else {
+            SET_ONTCREATEX_DISPOSITION(w, NTCREATEX_DISP_OPEN);
+        }
+    }
+    SET_ONTCREATEX_CREATE_OPTION(w, 0);
+    SET_ONTCREATEX_SECUTITY(w, 0);
+    SET_ONTCREATEX_SECURITY_FLAGS(w, 0);
+
+    SET_ONTCREATEX_NAME_LENGTH(w, 0);
 	
-	p = PTR_PACKET_B(o);
-	WRITE_BYTE(p, '\x04');
+    cifs_cp_tobuf(cifs_)
+
 	if (c->capabilities & CAP_UNICODE) {
 		WRITE_ALIGN(p, c->o, 2);
 		char *tmp = p;
@@ -221,88 +210,55 @@ int cifs_open(cifs_connect_p c, const char *name, int flags) {
 		WRITE_STRING_OEM(p, c->o_end, name);
 		cifs_path_fix_ucs(tmp);
 	}
-	END_PACKET_B(o, p);
+
 	if (cifs_request(c)) return -1;
-	return GET_WORD(c->i, OFF_PACKET_W(c->i));
-}
+    
+	return 
+}*/
 
 int cifs_close(cifs_connect_p c, int fid) {
-	char *o = c->o, *w;
-	
-	if (!c->connected) return -1;
-	
-	SET_PACKET_COMMAND(o, SMBclose);
-	w = PTR_PACKET_W(o);
-	SET_OCLOSE_FID(w, fid);
-	SET_OCLOSE_LAST_WRITE_TIME(w, -1);
-	SETLEN_PACKET_W(o, LEN_OCLOSE(w));
-	SETLEN_PACKET_B(o, 0);
-	
+    cifs_packet_setup(c->o, SMBclose, 6);
+    c->o->h->w[0] = fid;
+    c->o->h->w[1] = -1;
+    c->o->h->w[2] = -1;
 	if (cifs_request(c)) return -1;
-	
 	return 0;
 }
 
 
 static int cifs_read_andx_send(cifs_connect_p c, int fid, int count, uint64_t offset) {
-	char *o = c->o, *w;
+    REQUEST_SETUP(SMBreadX, readx, 0);
 	
 	if (count > c->max_buffer_size) count = c->max_buffer_size; //FIXME
-	
-	SET_PACKET_COMMAND(o, SMBreadX);
-	w = PTR_PACKET_W(o);
-	SETLEN_PACKET_W(o, LEN_OREADX(w));
-	SETLEN_PACKET_B(o, 0);
-	SET_OREADX_ANDX(w, 0xFF);
-	SET_OREADX_FID(w, fid);
-	SET_OREADX_OFFSET(w, offset);
-	SET_OREADX_OFFSET_HIGH(w, offset>>32);
-	SET_OREADX_MAX_COUNT(w, count);
-	SET_OREADX_MIN_COUNT(w, 0);
-	SET_OREADX_RESERVED(w, 0);
-	SET_OREADX_REMAINING(w, 0);
 
-	cifs_log_struct(w, OREADX);
+    req->andx.cmd = -1;
+    req->fid = fid;
+    req->offset = offset;
+    req->offset_high = offset>>32;
+    req->max_count = count;
 	return cifs_send(c);
 }
 
 static int cifs_read_raw_send(cifs_connect_p c, int fid, int count, uint64_t offset) {
-	char *o = c->o, *w;
+    REQUEST_SETUP(SMBreadbraw, readraw, 0);
 	if (count > c->max_raw_size) count = c->max_raw_size;
-	SET_PACKET_COMMAND(o, SMBreadbraw);
-	w = PTR_PACKET_W(o);	
-	SETLEN_PACKET_W(o, LEN_OREADRAW(w));
-	SETLEN_PACKET_B(o, 0);
-	SET_OREADRAW_FID(w, fid);
-	SET_OREADRAW_MAX_COUNT(w, count);
-	SET_OREADRAW_MIN_COUNT(w, 0);
-	SET_OREADRAW_TIMEOUT(w, 0);
-	SET_OREADRAW_RESERVED(w, 0);
-	SET_OREADRAW_OFFSET(w, offset);
-	SET_OREADRAW_OFFSET_HIGH(w, offset>>32);
-
-	cifs_log_struct(w, OREADRAW);
+    req->fid = fid;
+    req->max_count = count;
+    req->offset = offset;
+    req->offset_high = offset>>32;
 	return cifs_send(c);
 }
 
 static size_t cifs_read_andx_get(cifs_connect_p c, void **buf) {
-	char *w;
-	int len, off;
-	w = PTR_PACKET_W(c->i);
-
-	cifs_log_struct(w, IREADX);
-
-	len = GET_IREADX_DATA_COUNT(w);
-	off = GET_IREADX_DATA_OFFSET(w);
-	*buf = PTR_PACKET_MAGIC(c->i) + off;
+    int len = c->i->w->readx_res.data_count;
+    int off = c->i->w->readx_res.data_offset;
+    if (cifs_packet_range(c->i, off, len)) return -1;
+    *buf = cifs_packet_ptr(c->i, off);
 	return len;
 }
 
 static size_t cifs_read_raw_get(cifs_connect_p c, void **buf) {
-	int len;
-	len = GET_PACKET_LENGTH(c->i);
-	*buf = PTR_PACKET_MAGIC(c->i);
-	return len;
+	return -1;
 }
 
 static size_t cifs_read_andx_recv(cifs_connect_p c, void *buf, size_t count) {
@@ -352,6 +308,28 @@ size_t cifs_read(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t of
 	}
 	if (cifs_read_andx_send(c, fid, count, offset)) return -1;
 	return cifs_read_andx_recv(c, buf, count);
+}
+
+
+size_t cifs_write_andx(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t offset) {
+    CALL_SETUP(SMBwriteX, writex, 0);
+
+    if (count > c->max_buffer_size) count = c->max_buffer_size; //FIXME
+    req->andx.cmd = -1;	
+    req->fid = fid;
+    req->offset = offset;
+    req->offset_high = offset>>32;
+    req->data_length = count;
+    req->data_offset = cifs_packet_off_cur(o);
+    cifs_write_buf(o->b, buf, count);
+	
+    if (cifs_request(c)) return -1;
+
+    return res->count;
+}
+
+size_t cifs_write(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t offset) {
+    return cifs_write_andx(c, fid, buf, count, offset);
 }
 
 cifs_connect_p cifs_connect(const char *host, int port, const char *name) {

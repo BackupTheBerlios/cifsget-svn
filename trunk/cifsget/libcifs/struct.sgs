@@ -242,6 +242,23 @@ struct 	oreadraw
 	long offset_high
 end	oreadraw
 
+struct owriteraw
+    word fid
+    word count
+    word reserved
+    long offset
+    long timeout
+    word write_mode
+    long reserved2
+    word data_length
+    word data_offset
+    long offset_high
+end owriteraw
+
+struct iwriteraw
+    word remaining
+end iwriteraw
+
 struct 	oreadx
 	long andx
 	word fid
@@ -267,6 +284,26 @@ struct 	ireadx
 	word reserved5
 end	ireadx
 
+struct 	owritex
+	long andx
+	word fid
+	long offset
+    long reserved
+    word write_mode
+    word remaining
+    word data_length_high
+    word data_length
+    word data_offset
+    long offset_high
+end 	owritex
+
+struct iwritex
+    long andx
+    word count
+    word remaining
+    long reserved
+end iwritex
+
 struct 	oclose
 	word fid
 	long last_write_time
@@ -290,5 +327,38 @@ end 	nbtsession
 
 ##define LEN_NBTSESSION_DST(base)	33
 ##define LEN_NBTSESSION_SRC(base)	33
+
+struct ontcreatex
+    long andx
+    byte reserved
+    word name_length
+    long flags
+    long root_fid
+    long access
+    quad allocation_size
+    long ext_file_attributes
+    long share_access
+    long disposition
+    long option
+    long secutity
+    byte security_flags
+end ontcreatex
+
+struct  intcreatex
+    long andx
+    byte oplock
+    word fid
+    long create_action
+	nt_time creation_time
+	nt_time access_time
+	nt_time write_time
+	nt_time change_time
+    long ext_file_attributes
+    quad alloc
+    quad size
+    word type
+    word device
+    byte directory
+end     intcreatex
 
 ##endif /* STRUCT_H */

@@ -5,113 +5,89 @@ struct cifs_dir_s {
 	cifs_trans_t t;
 	int sid;
 	int end;
-	char *cur;
-	int count;
-	char buf[PATH_MAX + NAME_MAX + 2];
+    int count;
+    cifs_buf_p buf;
+    cifs_buf_p path;
 	cifs_dirent_t de;
 };
 
-static void cifs_build_stat(char *p, cifs_stat_p st) {
-	st->creation_time = GET_DIRINFO_CREATION_TIME(p);
-	st->access_time = GET_DIRINFO_ACCESS_TIME(p);
-	st->write_time = GET_DIRINFO_WRITE_TIME(p);
-	st->change_time = GET_DIRINFO_CHANGE_TIME(p);
-	st->file_size = GET_DIRINFO_FILE_SIZE(p);
-	st->allocation_size = GET_DIRINFO_ALLOCATION_SIZE(p);
-	st->attributes = GET_DIRINFO_ATTRIBUTES(p);
-	st->is_directory = GET_DIRINFO_ATTRIBUTES(p) & FILE_ATTRIBUTE_DIRECTORY ? 1 : 0;
+static void cifs_build_stat(struct cifs_dirinfo_s *di, cifs_stat_p st) {
+	st->creation_time = di->creation_time;
+	st->access_time = di->access_time;
+	st->write_time = di->write_time;
+	st->change_time = di->change_time;
+	st->file_size = di->file_size;
+	st->allocation_size = di->allocation_size;
+	st->attributes = di->attributes;
+	st->is_directory = di->attributes & FILE_ATTRIBUTE_DIRECTORY ? 1 : 0;
 }
 
-static void cifs_build_dirent(cifs_connect_p c, char *p, cifs_dirent_p de) {
-	int nl;
-	cifs_build_stat(p, &de->st);
-	nl = GET_DIRINFO_NAME_LEN(p);
+static void cifs_build_dirent(cifs_connect_p c, struct cifs_dirinfo_s *di, cifs_dirent_p de) {
+	cifs_build_stat(di, &de->st);
 	if (c->capabilities & CAP_UNICODE) {
-		cifs_cp_block(cifs_cp_ucs_to_sys, de->name, NAME_MAX, PTR_DIRINFO_NAME(p), nl);
+		cifs_cp_block(cifs_cp_ucs_to_sys, de->name, NAME_MAX, di->name, di->name_len);
 	} else {
-		cifs_cp_block(cifs_cp_oem_to_sys, de->name, NAME_MAX, PTR_DIRINFO_NAME(p), nl);
+		cifs_cp_block(cifs_cp_oem_to_sys, de->name, NAME_MAX, di->name, di->name_len);
 	}
 }
 
 static int cifs_find_first_req(cifs_connect_p c, const char *path, const char *mask) {
-	char *o=c->o, *b, *w, *p;
 	cifs_trans_req(c, SMBtrans2, NULL, 1, TRANSACT2_FINDFIRST);
-	
-	w = PTR_PACKET_W(o);
-	b = PTR_PACKET_B(o);
-	
-	SET_OFINDFIRST_SEARCH_ATTRIBUTES(b, 0x37);
-	SET_OFINDFIRST_SEARCH_COUNT(b, -1);
-	SET_OFINDFIRST_FLAGS(b, FLAG_TRANS2_FIND_CLOSE_IF_END);
-	SET_OFINDFIRST_INFORMATION_LEVEL(b, SMB_FIND_DIRECTORY_INFO);
-	SET_OFINDFIRST_SEARCH_STORAGE_TYPE(b, 0);
+    cifs_buf_p b = c->o->b;
+    CIFS_BUF_STRUCT(b, cifs_find_first_req_s, f);
 
-	p = PTR_OFINDFIRST_MASK(b);
+    f->search_attributes = 0x37;
+    f->search_count = -1;
+    f->flags = FLAG_TRANS2_FIND_CLOSE_IF_END;
+    f->information_level = SMB_FIND_DIRECTORY_INFO;
+    f->search_storage_type = 0;
+
 	if (c->capabilities & CAP_UNICODE) {
-		//WTF!!!???
-		//WRITE_ALIGN(p, c->o, 2);
-		char *tmp = p;
 		if (path && path[0]) {
-			WRITE_BUF_UCS(p, c->o_end, "/");
-			WRITE_BUF_UCS(p, c->o_end, path);
+            cifs_write_ucs(b, "/");
+            cifs_write_ucs(b, path);
 		}
 		if (mask && mask[0]) {
-			WRITE_BUF_UCS(p, c->o_end, "/");
-			WRITE_BUF_UCS(p, c->o_end, mask);
+            cifs_write_ucs(b, "/");
+            cifs_write_ucs(b, mask);
 		}
-		WRITE_WORD(p, 0);
-		cifs_path_fix_ucs(tmp);
+        cifs_write_word(b, 0);
+		cifs_path_fix_ucs(f->mask);
 	} else {
 		if (path && path[0]) {
-			WRITE_BUF_OEM(p, c->o_end, "/");
-			WRITE_BUF_OEM(p, c->o_end, path);
-		}
+            cifs_write_oem(b, "/");
+            cifs_write_oem(b, path);
+		}        
 		if (mask && mask[0]) {
-			WRITE_BUF_OEM(p, c->o_end, "/");
-			WRITE_BUF_OEM(p, c->o_end, mask);
+            cifs_write_oem(b, "/");
+            cifs_write_oem(b, mask);
 		}
-		WRITE_BYTE(p, 0);
-		cifs_path_fix_oem(PTR_OFINDFIRST_MASK(b));
+        cifs_write_byte(b, 0);
+		cifs_path_fix_oem(f->mask);
 	}
-	END_PACKET_B(o, p);
-	SET_OTRANS_PARAM_COUNT(w, LEN_PACKET_B(o));
-	SET_OTRANS_TOTAL_PARAM_COUNT(w, LEN_PACKET_B(o));
-	
-	cifs_log_struct(b, OFINDFIRST);
-
+    c->o->w->transaction_req.total_param_count = cifs_buf_len(b);
+    c->o->w->transaction_req.param_count = cifs_buf_len(b);
 	return 0;
 }
 
 static int cifs_find_next_req(cifs_connect_p c, int sid) {
-	char *o=c->o, *b, *w;
-	cifs_trans_req(c, SMBtrans2, NULL, 1, TRANSACT2_FINDNEXT);
-	
-	w = PTR_PACKET_W(o);
-	b = PTR_PACKET_B(o);
-	
-	SET_OFINDNEXT_SID(b, sid);
-	SET_OFINDNEXT_SEARCH_COUNT(b, -1);
-	SET_OFINDNEXT_INFORMATION_LEVEL(b, SMB_FIND_DIRECTORY_INFO);
-	SET_OFINDNEXT_RESUME_KEY(b, 0);
-	SET_OFINDNEXT_FLAGS(b, FLAG_TRANS2_FIND_CLOSE_IF_END | FLAG_TRANS2_FIND_CONTINUE);
-	strcpy(PTR_OFINDFIRST_MASK(b), "");
-	
-	SETLEN_PACKET_B(o, LEN_OFINDNEXT(b));
-	
-	SET_OTRANS_PARAM_COUNT(w, LEN_PACKET_B(o));
-	SET_OTRANS_TOTAL_PARAM_COUNT(w, LEN_PACKET_B(o));
-	
-	cifs_log_struct(b, OFINDNEXT);
-
-	return 0;
+    cifs_trans_req(c, SMBtrans2, NULL, 1, TRANSACT2_FINDNEXT);
+    cifs_buf_p b = c->o->b;
+    CIFS_BUF_STRUCT(b, cifs_find_next_req_s, f);
+    f->sid = sid;
+    f->search_count = -1;	
+    f->information_level = SMB_FIND_DIRECTORY_INFO;
+    f->resume_key = 0;
+    f->flags = FLAG_TRANS2_FIND_CLOSE_IF_END | FLAG_TRANS2_FIND_CONTINUE;
+    cifs_write_byte(b, 0);
+    c->o->w->transaction_req.param_count = cifs_buf_len(b);
+    c->o->w->transaction_req.total_param_count = cifs_buf_len(b);
+    return 0;
 }
 
 static int cifs_find_close_req(cifs_connect_p c, int sid) {
-	char *o=c->o;
-	SET_PACKET_COMMAND(o, SMBfindclose);
-	SETLEN_PACKET_W(o, 2);
-	SETLEN_PACKET_B(o, 0);
-	SET_WORD(PTR_PACKET_W(o), 0, sid);
+    cifs_packet_setup(c->o, SMBnegprot, 2);
+    c->o->h->w[0] = sid;
 	return 0;
 }
 
@@ -138,19 +114,20 @@ cifs_dir_p cifs_find(cifs_connect_p c, const char *path, const char *mask) {
 	}
 
 	cifs_log_trans("findfirst", &d->t);
-	cifs_log_struct(d->t.param, IFINDFIRST);
+    
+    CIFS_BUF_STRUCT(d->t.param, cifs_find_first_res_s, ff);
+    
+	d->end = ff->end_of_search;
+	d->sid = ff->sid;
+	d->buf = d->t.data;
+	d->count = ff->search_count;
 
-	d->end = GET_IFINDFIRST_END_OF_SEARCH(d->t.param);
-	d->sid = GET_IFINDFIRST_SID(d->t.param);
-	d->cur = d->t.data;
-	d->count = GET_IFINDFIRST_SEARCH_COUNT(d->t.param);
-	
-	d->de.path = d->buf;
-	char *p = d->buf;
-	WRITE_BUF(p, path);
-	WRITE_BUF(p, "/");
-	*p = '\0';
-	d->de.name = p;
+    d->path = cifs_buf_new(PATH_MAX + NAME_MAX + 2);
+
+	d->de.path = cifs_buf_cur(d->path);
+    cifs_write_str(d->path, path);
+    cifs_write_str(d->path, "/");
+	d->de.name = cifs_buf_cur(d->path);
 	
 	return d;
 }
@@ -172,19 +149,21 @@ loop:
 		if (cifs_trans_recv(f->c, &f->t)) return NULL;
 
 		cifs_log_trans("findnext", &f->t);
-		cifs_log_struct(f->t.param, IFINDNEXT);
 
-		f->end = GET_IFINDNEXT_END_OF_SEARCH(f->t.param);
-		f->cur = f->t.data;
-		f->count = GET_IFINDNEXT_SEARCH_COUNT(f->t.param);
+        CIFS_BUF_STRUCT(f->t.param, cifs_find_next_res_s, fn);
+
+		f->end = fn->end_of_search;
+		f->count = fn->search_count;
+		f->buf = f->t.data;
 		
 		if (f->count == 0) {
 			errno = ENOENT;
 			return NULL;
 		}
-	}	
-	cifs_build_dirent(f->c, f->cur, &f->de);
-	f->cur += GET_DIRINFO_NEXT_ENTRY_OFFSET(f->cur);
+	}
+    CIFS_BUF_STRUCT_PTR(f->buf, cifs_dirinfo_s, di);
+	cifs_build_dirent(f->c, di, &f->de);
+    cifs_buf_inc(f->buf, di->next_entry_offset);
 	f->count--;
 	if (f->de.st.is_directory && (!strcmp(f->de.name, ".") || !strcmp(f->de.name, ".."))) {
 		goto loop;
@@ -194,6 +173,7 @@ loop:
 
 int cifs_closedir(cifs_dir_p f) {
 	cifs_trans_free(&f->t);
+    cifs_buf_free(f->path);
 	if (!f->end) {
 		cifs_find_close_req(f->c, f->sid);
 		if (cifs_request(f->c)) return -1;
@@ -212,18 +192,19 @@ int cifs_stat(cifs_connect_p c, const char *path, cifs_stat_p st) {
 	}
 
 	cifs_log_trans("info", &tr);
-	cifs_log_struct(tr.param, IFINDFIRST);
-
-	if (GET_IFINDFIRST_SEARCH_COUNT(tr.param) != 1) {		
-		if (!GET_IFINDFIRST_END_OF_SEARCH(tr.param)) {
-			cifs_find_close_req(c, GET_IFINDFIRST_SID(tr.param));
+    CIFS_BUF_STRUCT(tr.param, cifs_find_first_res_s, ff);
+   
+	if (ff->search_count != 1) {		
+		if (!ff->end_of_search) {
+			cifs_find_close_req(c, ff->sid);
 			cifs_request(c);
 		}
 		cifs_trans_free(&tr);
 		errno = EMLINK;
 		return -1;
 	}
-	cifs_build_stat(tr.data, st);
+    CIFS_BUF_STRUCT(tr.data, cifs_dirinfo_s, di);    
+	cifs_build_stat(di, st);
 	cifs_trans_free(&tr);
 	return 0;
 }

@@ -10,8 +10,8 @@ const char *cifs_cp_ucs = "UCS-2LE";
 #define CIFS_CP_NULL ((cifs_cp_t)-1)
 
 cifs_cp_t cifs_cp_sys_to_oem = CIFS_CP_NULL,
-			cifs_cp_oem_to_sys = CIFS_CP_NULL, 
-			cifs_cp_sys_to_ucs = CIFS_CP_NULL, 
+			cifs_cp_oem_to_sys = CIFS_CP_NULL,
+			cifs_cp_sys_to_ucs = CIFS_CP_NULL,
 			cifs_cp_ucs_to_sys = CIFS_CP_NULL;
 
 size_t cifs_cp_block (cifs_cp_t cp, char *out_buf, size_t out_size, const char *in_buf, size_t in_size) {
@@ -47,7 +47,7 @@ size_t cifs_cp_block (cifs_cp_t cp, char *out_buf, size_t out_size, const char *
 				*out_ptr++ = 'A' + (unsigned char)*in_ptr % 16;
 				out_left -= 3;
 
-				*in_ptr++;
+				in_ptr++;
 				in_left--;
 				break;
 			case E2BIG:
@@ -98,7 +98,7 @@ char *cifs_cp_buf (cifs_cp_t cp, const char *in_buf, size_t in_size) {
 					*out_ptr++ = 'A' + (unsigned char)*in_ptr / 16;
 					*out_ptr++ = 'A' + (unsigned char)*in_ptr % 16;
 					out_left -= 3;					
-					*in_ptr++;
+					in_ptr++;
 					in_left--;
 					break;
 				}

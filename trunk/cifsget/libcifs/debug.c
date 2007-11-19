@@ -56,3 +56,11 @@ void cifs_log_flush(void) {
 	fflush(cifs_log_stream);
 }
 
+
+int cifs_log_buf(cifs_buf_p buf, const char *name) {
+    int res = 0;
+	res += cifs_log_msg("BUFFER %s S %d L %d\n", name, cifs_buf_size(buf), cifs_buf_len(buf));
+	res += cifs_log_hex(buf->b, cifs_buf_size(buf));
+    return res;
+}
+
