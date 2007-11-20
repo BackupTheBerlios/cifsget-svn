@@ -301,4 +301,38 @@ struct cifs_serverenum_s {
 	uint32_t comment;
 } PACKED;
 
+
+struct cifs_nt_createx_req_s {
+    struct cifs_andx_s andx;
+    uint8_t reserved;
+    uint16_t name_length;
+    uint32_t flags;
+    uint32_t root_fid;
+    uint32_t access;
+    uint64_t allocation_size;
+    uint32_t ext_file_attributes;
+    uint32_t share_access;
+    uint32_t disposition;
+    uint32_t option;
+    uint32_t secutity;
+    uint8_t security_flags;
+} PACKED;
+
+struct cifs_nt_createx_res_s {
+    struct cifs_andx_s andx;
+    uint8_t oplock;
+    uint16_t fid;
+    uint32_t create_action;
+    int64_t creation_time;
+	int64_t access_time;
+	int64_t write_time;
+	int64_t change_time;
+    uint32_t ext_file_attributes;
+    uint64_t alloc;
+    uint64_t size;
+    uint16_t type;
+    uint16_t device;
+    uint8_t directory;
+} PACKED;
+
 #endif

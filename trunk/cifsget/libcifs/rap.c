@@ -32,8 +32,10 @@ static cifs_enum_p cifs_rap_enum(cifs_connect_p c, int type) {
 	if (cifs_trans_alloc(&e->t)) goto err;
 	
 	e->c = c;
-	
+
+	if (cifs_tree_ipc(c)) goto err;
 	if (cifs_trans_request(c, &e->t)) goto err;
+    cifs_tree_set(c, -1);
 
 	cifs_log_trans("rapenum", &e->t);
 

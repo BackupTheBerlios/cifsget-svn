@@ -90,14 +90,6 @@ int cifs_tree_connect(cifs_connect_p c, const char *tree) {
 	return o->h->tid;
 }
 
-int cifs_tree_switch(cifs_connect_p c, int tid) {
-	int t;
-	t = c->o->h->tid;
-    c->o->h->tid = tid;
-	return t;
-}
-
-
 int cifs_tree_disconnect(cifs_connect_p c, int tid) {
     cifs_packet_setup(c->o, SMBtdis, 0);
     if (tid >= 0) c->o->h->tid = tid;
@@ -106,6 +98,26 @@ int cifs_tree_disconnect(cifs_connect_p c, int tid) {
 	return 0;
 }
 
+int cifs_tree_set(cifs_connect_p c, int tid) {
+    if (tid < 0) {
+        c->o->h->tid = c->tid;
+    } else {
+        c->o->h->tid = tid;
+    }
+	return 0;
+}
+
+int cifs_tree_ipc(cifs_connect_p c) {
+    if (c->ipc < 0) {
+        c->ipc = cifs_tree_connect(c, "IPC$");
+        if (c->ipc < 0) return -1;
+    } else {
+        cifs_tree_set(c, c->ipc);
+    }
+    return 0;
+}
+
+/*
 int cifs_open(cifs_connect_p c, const char *name, int flags) {
     cifs_packet_setup(c->o, SMBopen, 4);
 
@@ -131,74 +143,59 @@ int cifs_open(cifs_connect_p c, const char *name, int flags) {
 	}
 	if (cifs_request(c)) return -1;
 	return c->i->h->w[0];
-}
-/*
-int cifs_ntopen(cifs_connect_p c, const char *name, int flags) {
-	char *o = c->o, *w;
+}*/
 
-	SET_PACKET_COMMAND(o, SMBntcreateX);
-			
-	w = PTR_PACKET_W(o);
-    SETLEN_PACKET_W(o, LEN_ONTCREATEX(w));
-    SET_ONTCREATEX_ANDX(w, 0xFF);
-    SET_ONTCREATEX_RESERVED(w, 0);
+//#define FILE_GENERIC_ALL           0x10000000
+//#define FILE_GENERIC_EXECUTE       0x20000000
+#define GENERIC_WRITE         0x40000000
+#define GENERIC_READ          0x80000000
+
+int cifs_open(cifs_connect_p c, const char *name, int flags) {
+    CALL_SETUP(SMBntcreateX, nt_createx, 0);
+
+    req->andx.cmd = -1;
     if (flags & O_DIRECTORY) {
-        SET_ONTCREATEX_FLAGS(w, NTCREATEX_FLAGS_OPEN_DIRECTORY);
-    } else {
-        SET_ONTCREATEX_FLAGS(w, 0);
+        req->flags = NTCREATEX_FLAGS_OPEN_DIRECTORY;
     }
-    SET_ONTCREATEX_ROOT_FID(w, 0);
     if (flags & O_RDWR) {
-        SET_ONTCREATEX_ACCESS(w, FILE_GENERIC_READ | FILE_GENERIC_WRITE);
+        req->access = GENERIC_READ | GENERIC_WRITE;
 	} else if (flags & O_WRONLY) {
-        SET_ONTCREATEX_ACCESS(w, FILE_GENERIC_WRITE);
+        req->access = GENERIC_WRITE;
 	} else {
-        SET_ONTCREATEX_ACCESS(w, FILE_GENERIC_READ);
-	}   
-    SET_ONTCREATEX_ALLOCATION_SIZE(w, 0);
-    SET_ONTCREATEX_EXT_FILE_ATTRIBUTES(w, 0);
-    SET_ONTCREATEX_SHARE_ACCESS(w, NTCREATEX_SHARE_ACCESS_READ | NTCREATEX_SHARE_ACCESS_WRITE | NTCREATEX_SHARE_ACCESS_DELETE);  
+        req->access = GENERIC_READ;
+	}
+    
+    req->share_access = NTCREATEX_SHARE_ACCESS_READ | NTCREATEX_SHARE_ACCESS_WRITE | NTCREATEX_SHARE_ACCESS_DELETE;
 
     if (flags & O_CREAT) {
         if (flags & O_EXCL) {
-            SET_ONTCREATEX_DISPOSITION(w, NTCREATEX_DISP_CREATE);
+            req->disposition = NTCREATEX_DISP_CREATE;
         } else {
             if (flags & O_TRUNC) {
-                SET_ONTCREATEX_DISPOSITION(w, NTCREATEX_DISP_OVERWRITE_IF);
+                req->disposition = NTCREATEX_DISP_OVERWRITE_IF;
             } else {
-                SET_ONTCREATEX_DISPOSITION(w, NTCREATEX_DISP_OPEN_IF);
+                req->disposition = NTCREATEX_DISP_OPEN_IF;
             }
         }
     } else {
         if (flags & O_TRUNC) {
-            SET_ONTCREATEX_DISPOSITION(w, NTCREATEX_DISP_OVERWRITE);
+            req->disposition = NTCREATEX_DISP_OVERWRITE;
         } else {
-            SET_ONTCREATEX_DISPOSITION(w, NTCREATEX_DISP_OPEN);
+            req->disposition = NTCREATEX_DISP_OPEN;
         }
     }
-    SET_ONTCREATEX_CREATE_OPTION(w, 0);
-    SET_ONTCREATEX_SECUTITY(w, 0);
-    SET_ONTCREATEX_SECURITY_FLAGS(w, 0);
-
-    SET_ONTCREATEX_NAME_LENGTH(w, 0);
 	
-    cifs_cp_tobuf(cifs_)
-
 	if (c->capabilities & CAP_UNICODE) {
-		WRITE_ALIGN(p, c->o, 2);
-		char *tmp = p;
-		WRITE_STRING_UCS(p, c->o_end, name);
-		cifs_path_fix_ucs(tmp);
+        cifs_write_byte(o->b, 0);
+        cifs_write_path_ucs(o->b, name);
+        req->name_length = cifs_buf_len(o->b)-1;
 	} else {
-		char *tmp = p;
-		WRITE_STRING_OEM(p, c->o_end, name);
-		cifs_path_fix_ucs(tmp);
-	}
-
-	if (cifs_request(c)) return -1;
-    
-	return 
-}*/
+        cifs_write_path_oem(o->b, name);
+        req->name_length = cifs_buf_len(o->b);
+	}    
+    if (cifs_request(c)) return -1;
+    return res->fid;
+}
 
 int cifs_close(cifs_connect_p c, int fid) {
     cifs_packet_setup(c->o, SMBclose, 6);
@@ -242,7 +239,8 @@ static size_t cifs_read_andx_get(cifs_connect_p c, void **buf) {
 }
 
 static size_t cifs_read_raw_get(cifs_connect_p c, void **buf) {
-	return -1;
+    *buf = cifs_packet_ptr(c->i, 0);
+    return cifs_packet_size(c->i);
 }
 
 static size_t cifs_read_andx_recv(cifs_connect_p c, void *buf, size_t count) {
@@ -316,7 +314,7 @@ size_t cifs_write(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t o
     return cifs_write_andx(c, fid, buf, count, offset);
 }
 
-cifs_connect_p cifs_connect(const char *host, int port, const char *name) {
+cifs_connect_p cifs_connect(const char *host, int port, const char *name, const char *tree) {
 	cifs_connect_p c;
 	struct in_addr address;
 	int sock;
@@ -332,17 +330,12 @@ cifs_connect_p cifs_connect(const char *host, int port, const char *name) {
 		cifs_connect_close(c);
 		return NULL;
 	}
+    if (tree != NULL) {
+        c->tid = cifs_tree_connect(c, tree);
+    	if (c->tid < 0) {
+	    	cifs_connect_close(c);
+		    return NULL;
+    	}
+    }
 	return c;
 }
-
-cifs_connect_p cifs_connect_tree(const char *host, int port, const char *name, const char *tree) {
-	cifs_connect_p c;
-	c = cifs_connect(host, port, name);
-	if (!c) return NULL;
-	if (cifs_tree_connect(c, tree) < 0) {
-		cifs_connect_close(c);
-		return NULL;
-	}
-	return c;
-}
-

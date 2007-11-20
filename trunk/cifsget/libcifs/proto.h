@@ -24,4 +24,6 @@ int cifs_read_send(cifs_connect_p c, int fid, size_t size, uint64_t offset);
 size_t cifs_read_get(cifs_connect_p c, void **buf);
 size_t cifs_read_recv(cifs_connect_p c, void *buf, size_t size);
 
+int cifs_tree_ipc(cifs_connect_p c);
+
 #endif /* CIFS_PROTO_H */

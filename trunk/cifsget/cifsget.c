@@ -271,11 +271,6 @@ int cifs_list_node(cifs_connect_p c) {
 	cifs_node_t n;
 
 	if (!c) return -1;
-
-	if (cifs_tree_connect(c, "IPC$") < 0) {
-		perror("IPC$");
-		return -1;
-	}
 	
 	e = cifs_enum_domain(c);
 	if (e) {
@@ -366,7 +361,7 @@ int cifs_list_uri(cifs_uri_p uri) {
 	cifs_dir_p dir;
 	cifs_dirent_p de;
 	if (uri->tree) {
-		c = cifs_connect_tree(uri->addr, uri->port, uri->name, uri->tree);
+		c = cifs_connect(uri->addr, uri->port, uri->name, uri->tree);
 		if (!c) {
 			perror(uri->tree);
 			return -1;
@@ -392,13 +387,13 @@ int cifs_list_uri(cifs_uri_p uri) {
 			cifs_list(c, &d);
 		}
 	} else {
-		c = cifs_connect(uri->addr, uri->port, uri->name);
+		c = cifs_connect(uri->addr, uri->port, uri->name, NULL);
 		if (!c) {
 			perror(uri->name);
 			return -1;
 		}
 		cifs_list(c, NULL);
-	}	
+	}
 	cifs_connect_close(c);	
 	return 0;
 }
@@ -500,7 +495,7 @@ int cifs_action(int action, cifs_uri_p uri) {
 	cifs_dir_p dir;
 	cifs_dirent_p de;
 	if (uri->tree) {
-		c = cifs_connect_tree(uri->addr, uri->port, uri->name, uri->tree);
+		c = cifs_connect(uri->addr, uri->port, uri->name, uri->tree);
 		if (!c) {
 			perror(uri->tree);
 			return -1;
@@ -546,7 +541,7 @@ int cifs_action(int action, cifs_uri_p uri) {
 			}
 		}
 	} else {
-		c = cifs_connect(uri->addr, uri->port, uri->name);
+		c = cifs_connect(uri->addr, uri->port, uri->name, NULL);
 		if (!c) {
 			perror(uri->name);
 			return -1;

@@ -19,6 +19,7 @@ typedef cifs_packet_t *cifs_packet_p;
 #define cifs_packet_off(pac, ptr) (cifs_buf_off(pac->p,  ptr) - 4)
 #define cifs_packet_off_cur(pac) (cifs_buf_off(pac->p,  pac->b->p) - 4)
 #define cifs_packet_range(pac, off, len) cifs_buf_range(pac->p, off+4, len)
+#define cifs_packet_size(pac)   (cifs_buf_size(pac->p) - 4)
 
 struct cifs_connect_s {
 	int sock;
@@ -30,6 +31,9 @@ struct cifs_connect_s {
 	int max_buffer_size;
 	int max_raw_size;
 	int capabilities;
+
+    int tid;
+    int ipc; //IPC TID
 	
 	int connected;
 

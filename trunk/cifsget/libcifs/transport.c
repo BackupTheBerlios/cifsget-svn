@@ -203,6 +203,9 @@ cifs_connect_p cifs_connect_new(int sock, const char *name) {
     c->o->b = cifs_buf_new(0);
 	c->sock = sock;
 
+    c->tid = -1;
+    c->ipc = -1;
+
 	c->name = strdup(name);
 	c->connected = 1;
 	return c;
@@ -404,7 +407,7 @@ int cifs_request(cifs_connect_p c) {
 		
 		errno = EIO;
 		return -1;
-	}    
+	}
 	if (cifs_packet_errno(c->i)) {
 		return -1;
 	}
