@@ -1,21 +1,10 @@
 #ifndef _DEBUG_H
 #define _DEBUG_H
 
-extern int cifs_log_level;
-extern FILE *cifs_log_stream;
-
 int cifs_log_msg(const char *fmt, ...);
 int cifs_log_hex(void *buf, int len);
 int cifs_log_buf(cifs_buf_p buf, const char *name);
 void cifs_log_flush(void);
-
-#define CIFS_LOG_QUIET   0
-#define CIFS_LOG_ERROR   1
-#define CIFS_LOG_WARNING 2
-#define CIFS_LOG_NORMAL  3
-#define CIFS_LOG_VERBOSE 4
-#define CIFS_LOG_DEBUG   5
-#define CIFS_LOG_NOISY   6
 
 #define cifs_log(level, ...)	((cifs_log_level >= level)?cifs_log_msg(__VA_ARGS__):0)
 

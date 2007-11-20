@@ -1,30 +1,16 @@
 #include "includes.h"
 
-#include "struct2.h"
-
-time_t cifs_time(int64_t nttime) {
-	return (time_t)(((nttime)/10000000) - 11644473600);
-}
-
-void cifs_path_fix_oem (char *path) {
-	for (char *p = path; *p ; p++) if (*p == '/') *p = '\\';
-}
-
-void cifs_path_fix_ucs (char *path) {
-	for (uint16_t *p = (uint16_t *)path; *p ; p++) if (*p == '/') *p = '\\';
-}
-
 int cifs_negotiate(cifs_connect_p c) {
     cifs_packet_p i = c->i;
     cifs_packet_p o = c->o;
     ZERO_STRUCTP(o->h);
     WORDS_STRUCT(i, cifs_negotiate_res_s, res);
     cifs_packet_setup(o, SMBnegprot, 0);
-    strncpy(o->h->magic, "\xFFSMB", 4);
+    strncpy(o->h->magic, CIFS_MAGIC, 4);
     o->h->flags = FLAG_CANONICAL_PATHNAMES | FLAG_CASELESS_PATHNAMES;
     o->h->flags2 = FLAGS2_LONG_PATH_COMPONENTS | FLAGS2_IS_LONG_NAME;
     o->h->tid = -1;
-    cifs_write_oemz(o->b, "\x02NT LM 0.12");
+    cifs_write_strz(o->b, "\x02NT LM 0.12");
 
     if (cifs_request(c)) return -1;
 
@@ -38,10 +24,10 @@ int cifs_negotiate(cifs_connect_p c) {
 	
 	c->capabilities = res->capabilities;
 
-	c->time = res->time;
+	c->time = cifs_time(res->time);
 	c->zone = res->zone * 60;
 
-	cifs_log_verbose("server zone: UTC %+d time: %s\n", c->zone/3600, ctime(&c->time));
+	cifs_log_verbose("server time: UTC %+d %s\n", c->zone/3600, ctime(&c->time));
 
 	//c->capabilities &= !CAP_UNICODE;
 	
@@ -60,7 +46,8 @@ int cifs_sessionsetup(cifs_connect_p c) {
     req->capabilities = c->capabilities & (CAP_RAW_MODE | CAP_LARGE_FILES | CAP_UNICODE);
 	
 	if (c->capabilities & CAP_UNICODE) {
-        cifs_write_align(o->b, 2);
+//FIXME:        cifs_write_align(o->b, 2);
+//        cifs_write_byte(o->b, 0);
         cifs_write_ucsz(o->b, "GUEST");
         cifs_write_ucsz(o->b, "");
         cifs_write_ucsz(o->b, "LINUX");
@@ -83,7 +70,6 @@ int cifs_tree_connect(cifs_connect_p c, const char *tree) {
     o->h->tid = -1;
     req->andx.cmd = -1;
 	if (c->capabilities & CAP_UNICODE) {
-//        cifs_write_align(o->b, 2);
         cifs_write_byte(o->b, 0);
         cifs_write_ucs(o->b, "\\\\");
 		cifs_write_ucs(o->b, c->name);
@@ -139,12 +125,10 @@ int cifs_open(cifs_connect_p c, const char *name, int flags) {
     cifs_write_byte(c->o->b, '\x04');
 	
 	if (c->capabilities & CAP_UNICODE) {
-        cifs_write_align(c->o->b, 2);
-        cifs_write_ucsz(c->o->b, name);
+        cifs_write_path_ucsz(c->o->b, name);
 	} else {
-        cifs_write_oem(c->o->b, name);
+        cifs_write_path_oemz(c->o->b, name);
 	}
-    cifs_path_fix_ucs(c->o->b->b);
 	if (cifs_request(c)) return -1;
 	return c->i->h->w[0];
 }

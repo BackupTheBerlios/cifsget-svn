@@ -1,8 +1,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <getopt.h>
+#include <stdarg.h>
 
-#include "libcifs/includes.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include "libcifs/cifs.h"
 #include "uri.h"
 #include "flow.h"
 #include "mirror.h"
@@ -256,7 +262,7 @@ int cifs_list_dir(cifs_connect_p c, const char *path) {
 		total += e->st.file_size;
 	}
 	cifs_closedir(d);
-	cifs_log_normal("total: %s\n", cifs_hsize(total, NULL));
+	printf("total: %s\n", cifs_hsize(total, NULL));
 	return 0;
 }
 
@@ -283,16 +289,16 @@ int cifs_list_node(cifs_connect_p c) {
 		}
 		cifs_enum_close(e);
 		
-		cifs_log_normal("\n");
+		printf("\n");
 		
 		for (p = dom ; *p ; p++) {
 			e = cifs_enum_server(c, *p);
 			if (e) {
-				cifs_log_normal("%s:\n", *p);
+				printf("%s:\n", *p);
 				while (!cifs_enum_next(e, &n)) {
 					cifs_print_node(&n);
 				}
-				cifs_log_normal("\n");
+				printf("\n");
 				cifs_enum_close(e);
 			}
 			free(*p);
@@ -314,9 +320,9 @@ int cifs_list_node(cifs_connect_p c) {
 int cifs_list(cifs_connect_p c, cifs_dirent_p di) {	
 	if (di) {
 		if (di->st.is_directory) {
-			cifs_log_normal("%s:\n", di->name);
+		    printf("%s:\n", di->name);
 			cifs_list_dir(c, di->path);
-			cifs_log_normal("\n");
+			printf("\n");
 		} else {
 			cifs_print_file(di);
 		}

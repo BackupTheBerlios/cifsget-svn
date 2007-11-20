@@ -36,7 +36,7 @@ int cifs_write_oem(cifs_buf_p dst, const char *src) {
     res = cifs_cp_block(cifs_cp_sys_to_oem, cifs_buf_cur(dst), cifs_buf_left(dst), src, strlen(src));
     if (res < 0) {
         cifs_log_error("iconv error\n");
-        return -1;
+        return 0;
     }
     dst-> p += res;
     return res;
@@ -47,9 +47,34 @@ int cifs_write_ucs(cifs_buf_p dst, const char *src) {
     res = cifs_cp_block(cifs_cp_sys_to_ucs, cifs_buf_cur(dst), cifs_buf_left(dst), src, strlen(src));
     if (res < 0) {
         cifs_log_error("iconv error\n");
-        return -1;
+        return 0;
     }
     dst-> p += res;
     return res/2;
+}
+
+
+int cifs_write_path_oem (cifs_buf_p buf, const char *path) {
+    int len;
+    char *p = cifs_buf_cur(buf);
+    len = cifs_write_oem(buf, path);
+    for (int i = 0 ; i <= len ; i++) {
+        if (p[i] == '/') {
+            p[i] = '\\';
+        }
+    }
+    return len;
+}
+
+int cifs_write_path_ucs (cifs_buf_p buf, const char *path) {
+    int len;
+    uint16_t *p = (uint16_t *)cifs_buf_cur(buf);
+    len = cifs_write_ucs(buf, path);
+    for (int i = 0 ; i <= len ; i++) {
+        if (p[i] == '/') {
+            p[i] = '\\';
+        }
+    }
+    return len;
 }
 

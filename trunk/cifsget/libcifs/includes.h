@@ -13,7 +13,7 @@
 #include <winsock.h>
 
 #ifndef MSG_WAITALL
-#define MSG_WAITALL 0
+    #define MSG_WAITALL 0
 #endif
 
 #else
@@ -35,29 +35,19 @@
 #include <sys/time.h>
 #include <time.h>
 
+#include "cifs.h"
+
 #include "buffer.h"
 #include "struct.h"
-
 #include "transport.h"
 #include "proto.h"
-
-#include "find.h"
-#include "rap.h"
-
-#ifdef _LIBCIFS
 
 #include "transact.h"
 
 #include "smb.h"
 #include "trans2.h"
 #include "doserr.h"
-#include "byteorder.h"
-
 #include "codepage.h"
-
-#endif
-
 #include "debug.h"
 
 #endif /* LIBCIFS_INCLUDES_H */
-

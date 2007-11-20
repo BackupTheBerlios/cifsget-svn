@@ -3,6 +3,41 @@
 
 #define PACKED __attribute__((__packed__))
 
+struct cifs_nbt_header_s {
+	uint8_t type;
+	uint8_t flags;
+	uint8_t length[2];
+} PACKED;
+
+struct cifs_nbt_session_s {
+    struct cifs_nbt_header_s nbt;
+	uint8_t dst[34];
+	uint8_t src[34];
+} PACKED;
+
+struct cifs_header_s {
+    struct cifs_nbt_header_s nbt;
+    char        magic[4];
+    uint8_t     cmd;
+    uint8_t     error_class;
+    uint8_t     reserved;
+    uint16_t    error;
+    uint8_t     flags;
+    uint16_t    flags2;
+    uint16_t    pid_high;
+    uint64_t    signature;
+    uint16_t    unused;
+    uint16_t    tid;
+    uint16_t    pid;
+    uint16_t    uid;
+    uint16_t    mid;
+    uint8_t	    wc;
+    uint16_t    w[1];
+} PACKED;
+typedef struct cifs_header_s *cifs_header_p;
+
+/* WORDS STRUCTS */
+
 struct cifs_negotiate_res_s {
     uint16_t    dialect_index;
     uint8_t     security_mode;
@@ -12,7 +47,7 @@ struct cifs_negotiate_res_s {
     uint32_t    max_raw_size;
     uint32_t    session_key;
     uint32_t    capabilities;
-    uint64_t    time;
+    int64_t     time;
     int16_t     zone;
     uint8_t     encryption_key_length;
 } PACKED;
@@ -192,27 +227,7 @@ union cifs_words_u {
 } PACKED;
 typedef union cifs_words_u *cifs_words_p;
 
-struct cifs_header_s {
-    uint8_t     type;
-    uint8_t     length[3];
-    char        magic[4];
-    uint8_t     cmd;
-    uint8_t     error_class;
-    uint8_t     reserved;
-    uint16_t    error;
-    uint8_t     flags;
-    uint16_t    flags2;
-    uint16_t    pid_high;
-    uint64_t    signature;
-    uint16_t    unused;
-    uint16_t    tid;
-    uint16_t    pid;
-    uint16_t    uid;
-    uint16_t    mid;
-    uint8_t	    wc;
-    uint16_t    w[1];
-} PACKED;
-typedef struct cifs_header_s *cifs_header_p;
+/* TRANSACTIONS STRUCTS */
 
 struct	cifs_find_first_req_s {
 	uint16_t search_attributes;

@@ -1,5 +1,9 @@
 #include "includes.h"
 
+time_t cifs_time(int64_t nt_time) {
+	return (time_t)(((nt_time)/10000000) - 11644473600);
+}
+
 struct cifs_dir_s {
 	cifs_connect_p c;
 	cifs_trans_t t;
@@ -41,29 +45,26 @@ static int cifs_find_first_req(cifs_connect_p c, const char *path, const char *m
     f->flags = FLAG_TRANS2_FIND_CLOSE_IF_END;
     f->information_level = SMB_FIND_DIRECTORY_INFO;
     f->search_storage_type = 0;
-
 	if (c->capabilities & CAP_UNICODE) {
 		if (path && path[0]) {
-            cifs_write_ucs(b, "/");
-            cifs_write_ucs(b, path);
+            cifs_write_path_ucs(b, "/");
+            cifs_write_path_ucs(b, path);
 		}
 		if (mask && mask[0]) {
-            cifs_write_ucs(b, "/");
-            cifs_write_ucs(b, mask);
+            cifs_write_path_ucs(b, "/");
+            cifs_write_path_ucs(b, mask);
 		}
         cifs_write_word(b, 0);
-		cifs_path_fix_ucs(f->mask);
 	} else {
 		if (path && path[0]) {
-            cifs_write_oem(b, "/");
-            cifs_write_oem(b, path);
+            cifs_write_path_oem(b, "/");
+            cifs_write_path_oem(b, path);
 		}        
 		if (mask && mask[0]) {
-            cifs_write_oem(b, "/");
-            cifs_write_oem(b, mask);
+            cifs_write_path_oem(b, "/");
+            cifs_write_path_oem(b, mask);
 		}
         cifs_write_byte(b, 0);
-		cifs_path_fix_oem(f->mask);
 	}
     c->o->w->transaction_req.total_param_count = cifs_buf_len(b);
     c->o->w->transaction_req.param_count = cifs_buf_len(b);

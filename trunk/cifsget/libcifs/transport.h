@@ -1,27 +1,26 @@
 #ifndef TRANSPORT_H
 #define TRANSPORT_H
 
-#define CIFS_MAGIC	0xFF534D42	/* 0xFF 'S' 'M' 'B' */
+#define CIFS_MAGIC	"\xffSMB"
 
 #define CIFS_MAX_BUFFER 65535
 
 #define CIFS_MAX_RAW (60*1024)
 
 typedef struct cifs_packet_s {
-    cifs_buf_p buf;
-    struct cifs_header_s *h;
-    union cifs_words_u *w;
+    cifs_buf_p p;
+    cifs_header_p h;
+    cifs_words_p w;
     cifs_buf_p b;
 } cifs_packet_t;
 typedef cifs_packet_t *cifs_packet_p;
 
+#define cifs_packet_ptr(pac, off) cifs_buf_ptr(pac->p,  off+4)
+#define cifs_packet_off(pac, ptr) (cifs_buf_off(pac->p,  ptr) - 4)
+#define cifs_packet_off_cur(pac) (cifs_buf_off(pac->p,  pac->b->p) - 4)
+#define cifs_packet_range(pac, off, len) cifs_buf_range(pac->p, off+4, len)
 
-#define cifs_packet_ptr(pac, off) cifs_buf_ptr(pac->buf,  off+4)
-#define cifs_packet_off(pac, ptr) (cifs_buf_off(pac->buf,  ptr) - 4)
-#define cifs_packet_off_cur(pac) (cifs_buf_off(pac->buf,  pac->b->p) - 4)
-#define cifs_packet_range(pac, off, len) cifs_buf_range(pac->buf, off+4, len)
-
-typedef struct cifs_connect_s {
+struct cifs_connect_s {
 	int sock;
 
     cifs_packet_p i, o;
@@ -36,19 +35,15 @@ typedef struct cifs_connect_s {
 
 	time_t time;
 	int zone;	
-} cifs_connect_t;
-typedef cifs_connect_t *cifs_connect_p;
+};
 
 void cifs_packet_setup(cifs_packet_p packet, int command, int words_size);
 void cifs_packet_log(cifs_packet_p);
 int cifs_packet_errno(cifs_packet_p packet);
 
 int cifs_resolve(const char *host, struct in_addr *addr);
-
 int cifs_connect_sock(const struct in_addr *address, int port , const char *local_name, const char *remote_name);
 cifs_connect_p cifs_connect_new(int sock, const char *name);
-void cifs_connect_close(cifs_connect_p c);
-int cifs_connected(cifs_connect_p c);
 
 int cifs_send(cifs_connect_p c);
 int cifs_recv(cifs_connect_p c);
@@ -60,4 +55,3 @@ size_t cifs_recv_raw(cifs_connect_p c, void *buf, size_t count);
 int cifs_request(cifs_connect_p c);
 
 #endif /* TRANSPORT_H */
-

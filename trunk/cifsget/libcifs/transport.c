@@ -13,39 +13,39 @@ void cifs_packet_log(cifs_packet_p p) {
 int cifs_recv_skip_sock(int sock, int size);
 
 int cifs_packet_parse(cifs_packet_p packet) {
-    int size = cifs_buf_size(packet->buf);
+    int size = cifs_buf_size(packet->p);
     int wc, bc;
 	if (size <  sizeof(struct cifs_header_s)) return -1;
-	if (memcmp((unsigned char*)packet->h->magic, "\xFFSMB", 4)) return -1;
+	if (memcmp((char*)packet->h->magic, CIFS_MAGIC, 4)) return -1;
     wc = packet->h->wc;
-	if (size < sizeof(struct cifs_header_s) + wc*2) return -1;
+    if (size < sizeof(struct cifs_header_s) + wc*2) return -1;
     bc = packet->h->w[wc];
 	if (size != sizeof(struct cifs_header_s) + wc*2 + bc) return -1;
-    cifs_buf_setup(packet->b, (char *)packet->h->w + wc + 1, bc);
+    cifs_buf_setup(packet->b, (char *)(packet->h->w + wc + 1), bc);
 	return 0;
 }
 
 int cifs_packet_unparse(cifs_packet_p packet) {
     packet->b->l = packet->b->p;
-    packet->buf->l = packet->b->p;
-    int size = cifs_buf_size(packet->buf) - 4;
-    packet->h->length[2] = size;
-    packet->h->length[1] = size>>8;
+    packet->p->l = packet->b->p;
+    int size = cifs_buf_size(packet->p) - 4;
+    packet->h->nbt.length[1] = size;
+    packet->h->nbt.length[0] = size>>8;
     packet->h->w[packet->h->wc] = cifs_buf_len(packet->b);
     return size + 4;
 }
 
 int cifs_packet_length(cifs_packet_p packet) {
-    return packet->h->length[2] + (packet->h->length[1] << 8);
+    return packet->h->nbt.length[1] + (packet->h->nbt.length[0] << 8);
 }
 
 void cifs_packet_setup(cifs_packet_p packet, int cmd, int words_size) {
-    cifs_buf_limit(packet->buf, -1);
+    cifs_buf_limit(packet->p, -1);
     packet->h->cmd = cmd;
     int wc = (words_size + 1) / 2;
     packet->h->wc = wc;
-    int off = cifs_buf_off(packet->buf, (char *)(packet->h->w+wc+1));
-    cifs_buf_setup(packet->b, cifs_buf_ptr(packet->buf, off), cifs_buf_size(packet->buf) - off);
+    int off = cifs_buf_off(packet->p, (char *)(packet->h->w+wc+1));
+    cifs_buf_setup(packet->b, cifs_buf_ptr(packet->p, off), cifs_buf_size(packet->p) - off);
 }
 
 int cifs_packet_errno(cifs_packet_p packet) {
@@ -99,59 +99,49 @@ int cifs_packet_errno(cifs_packet_p packet) {
 }
 
 char *cifs_nbt_name(char *buf, const char *name) {
-	int i;
-	int c;
-	for (i = 0 ; i<16 && name[i] ; i++) {
+	int i, c;
+    buf[0] = 0x20;
+	for (i = 0 ; i < 16 && name[i] ; i++) {
 		c = toupper(name[i]);
-		buf[i*2 ]  = 'A' + ((c >> 4) & 0xF);
-		buf[i*2+1] = 'A' + (c & 0xF);
+		buf[i*2+1] = 'A' + ((c >> 4) & 0xF);
+		buf[i*2+2] = 'A' + (c & 0xF);
 	}
 	for (; i<16 ; i++) {
-		buf[i*2]   = 'C';
-		buf[i*2+1] = 'A';
+		buf[i*2+1] = 'C';
+		buf[i*2+2] = 'A';
 	}
-	buf[32] = '\0';
+	buf[33] = 0x00;
 	return buf;
 }
 
-/* int cifs_nbt_session(int sock, const char *local, const char *remote) {
-	char b[LEN_NBTSESSION(NULL)];
-	char h[LEN_NBTHEADER(NULL)];
+int cifs_nbt_session(int sock, const char *local, const char *remote) {
+    struct cifs_nbt_session_s s;
 	unsigned char code;
-	int len, type;
-	SET_NBTSESSION_TYPE(b, 0x81);
-	SET_NBTSESSION_FLAGS(b, 0);
-	SET_NBTSESSION_LENGTH(b, 68);
-	SET_NBTSESSION_SRC_TYPE(b, 0x20);
-	SET_NBTSESSION_DST_TYPE(b, 0x20);
-	cifs_nbt_name(PTR_NBTSESSION_SRC(b), local);
-	cifs_nbt_name(PTR_NBTSESSION_DST(b), remote);
-	
-	cifs_log_struct(b, NBTSESSION);
+    s.nbt.type = 0x81;
+    s.nbt.flags = 0;
+    s.nbt.length[0] = 0;
+    s.nbt.length[1] = 68;
+	cifs_nbt_name((char *)s.src, local);
+	cifs_nbt_name((char *)s.dst, remote);
+    cifs_log_debug("NBT req 0x%02x len 68 src \"%s\" dst \"%s\"\n", s.nbt.type, local, remote);
+    cifs_log_hex_debug(&s, sizeof(s));
+	if (send(sock, &s, sizeof(s), 0) != sizeof(s)) return -1;
+	if (recv(sock, &s, 4, 0) != 4) return -1;
+    int len = s.nbt.length[1] + (s.nbt.length[0] << 8);
+    cifs_log_debug("NBT res 0x%02x len %d\n", s.nbt.type, len);
 
-	
-	
-	if (send(sock, b, sizeof(b), 0) != sizeof(b)) return -1;
-	if (recv(sock, h, sizeof(h), 0) != sizeof(h)) return -1;
-	
-	cifs_log_struct(h, NBTHEADER);
-
-	type = GET_NBTHEADER_TYPE(h);
-
-	len = GET_NBTHEADER_LENGTH(h);
-
-	if (type == 0x82) return 0;
-
-	if (type == 0x83 && len == 1 && recv(sock, &code, 1, 0) == 1) {
-		cifs_log_error("netbios negative session response 0x%0X code 0x%0X for \"%s\"\n", type, code, remote);
+	if (s.nbt.type == 0x82) return 0;
+    
+	if (s.nbt.type == 0x83 && len == 1 && recv(sock, &code, 1, 0) == 1) {
+		cifs_log_error("NBT error 0x%02X code 0x%02X\n", s.nbt.type, code);
 		errno = ENOENT;
-		return -1;
+        return -1;
 	}
-	cifs_log_error("netbios negative session response 0x%0X for \"%s\"\n", type, remote);
+	cifs_log_error("NBT error 0x%02X\n", s.nbt.type);
 	if (len) cifs_recv_skip_sock(sock, len);
 	errno = ECONNABORTED;
 	return -1;
-} */
+}
 
 
 int cifs_resolve(const char *host, struct in_addr *addr) {
@@ -179,7 +169,7 @@ int cifs_connect_sock(const struct in_addr *address, int port , const char *loca
 		addr.sin_port =  htons(port);
 		cifs_log_verbose("connecting to %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 		if (connect(sock, (struct sockaddr*)&addr, sizeof(addr))) goto err;
-		//if (port == 139 && cifs_nbt_session(sock, local_name, remote_name)) goto err;
+		if (port == 139 && cifs_nbt_session(sock, local_name, remote_name)) goto err;
 	} else {
 		addr.sin_port =  htons(445);
 		cifs_log_verbose("connecting to %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
@@ -187,7 +177,7 @@ int cifs_connect_sock(const struct in_addr *address, int port , const char *loca
 			addr.sin_port =  htons(139);
 			cifs_log_verbose("connecting to %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 			if (connect(sock, (struct sockaddr*)&addr, sizeof(addr))) goto err;
-			//if (cifs_nbt_session(sock, local_name, remote_name)) goto err;
+			if (cifs_nbt_session(sock, local_name, remote_name)) goto err;
 		}
 	}
 	return sock;
@@ -201,16 +191,18 @@ cifs_connect_p cifs_connect_new(int sock, const char *name) {
 	NEW_STRUCT(c);
     NEW_STRUCT(c->i);
     NEW_STRUCT(c->o);
-    c->i->buf = cifs_buf_new(CIFS_MAX_BUFFER + 4);
-    c->i->h = (cifs_header_p) c->i->buf->b;
+
+    c->i->p = cifs_buf_new(CIFS_MAX_BUFFER + 4);
+    c->i->h = (cifs_header_p) cifs_buf_ptr(c->i->p, 0);
     c->i->w = (cifs_words_p) c->i->h->w;
     c->i->b = cifs_buf_new(0);
 
-	c->o->buf = cifs_buf_new(CIFS_MAX_BUFFER + 4);
-    c->o->h = (struct cifs_header_s*) c->o->buf->b;
+	c->o->p = cifs_buf_new(CIFS_MAX_BUFFER + 4);
+    c->o->h = (cifs_header_p) cifs_buf_ptr(c->o->p, 0);
     c->o->w = (cifs_words_p) c->o->h->w;
     c->o->b = cifs_buf_new(0);
 	c->sock = sock;
+
 	c->name = strdup(name);
 	c->connected = 1;
 	return c;
@@ -255,7 +247,7 @@ int cifs_send(cifs_connect_p c) {
 	}
 
 	len = cifs_packet_unparse(c->o);
-    p = cifs_buf_ptr(c->o->buf, 0);
+    p = cifs_buf_ptr(c->o->p, 0);
 	cifs_packet_log(c->o);
 
     while (len) {
@@ -362,7 +354,7 @@ int cifs_recv(cifs_connect_p c) {
 		return -1;
 	}
 
-    cifs_buf_p buf = c->i->buf;
+    cifs_buf_p buf = c->i->p;
 
     cifs_buf_limit(buf, 4);
     cifs_buf_reset(buf);
@@ -373,7 +365,7 @@ int cifs_recv(cifs_connect_p c) {
         cifs_buf_inc(buf, res);
 		if (cifs_buf_left(buf) == 0 && cifs_buf_len(buf) == 4) {
 			size = cifs_packet_length(c->i);
-			if (c->i->h->type) {
+			if (c->i->h->nbt.type) {
                 // FIXME: call special callback
 				cifs_recv_skip(c, size);
                 cifs_buf_reset(buf);
@@ -428,7 +420,7 @@ int cifs_recv_async(cifs_connect_p c) {
 		return -1;
 	}	
     
-    cifs_buf_p buf = c->i->buf;
+    cifs_buf_p buf = c->i->p;
 	
 	if (cifs_buf_left(buf) == 0) {
         cifs_buf_limit(buf, 4);
@@ -450,7 +442,7 @@ int cifs_recv_async(cifs_connect_p c) {
 				return -1;
 			}
         } else {
-            if (c->i->h->type) {
+            if (c->i->h->nbt.type) {
                 /* drop */
             	errno = EAGAIN;
                 return -1;
