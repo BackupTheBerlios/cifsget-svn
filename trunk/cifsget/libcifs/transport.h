@@ -33,9 +33,7 @@ struct cifs_connect_s {
 	int capabilities;
 
     int tid;
-    int ipc; //IPC TID
-	
-	int connected;
+    int ipc;    //IPC$ TID
 
 	time_t time;
 	int zone;	

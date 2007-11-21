@@ -263,8 +263,7 @@ struct cifs_find_next_res_s {
 	uint16_t last_name_offset;
 } PACKED;
 
-
-struct  cifs_dirinfo_s {
+struct  cifs_find_dirinfo_s {
 	uint32_t next_entry_offset;
 	uint32_t file_index;
 	int64_t creation_time;
@@ -273,11 +272,10 @@ struct  cifs_dirinfo_s {
 	int64_t change_time;
 	uint64_t file_size;
 	uint64_t allocation_size;
-	uint32_t attributes;
-	uint32_t name_len;
+	uint32_t ext_file_attributes;
+	uint32_t name_length;
 	char name[0];
 } PACKED;
-
 
 struct cifs_rapenum_s {
 	uint16_t status;
@@ -328,8 +326,8 @@ struct cifs_nt_createx_res_s {
 	int64_t write_time;
 	int64_t change_time;
     uint32_t ext_file_attributes;
-    uint64_t alloc;
-    uint64_t size;
+    uint64_t allocation_size;
+    uint64_t file_size;
     uint16_t type;
     uint16_t device;
     uint8_t directory;

@@ -1,12 +1,12 @@
 #include "includes.h"
 
 time_t cifs_time(int64_t nt_time) {
-	return (time_t)(((nt_time)/10000000) - 11644473600);
+	return (time_t)((nt_time/10000000) - 11644473600);
 }
 
 struct cifs_dir_s {
 	cifs_connect_p c;
-	cifs_trans_t t;
+	cifs_trans_p t;
 	int sid;
 	int end;
     int count;
@@ -15,30 +15,30 @@ struct cifs_dir_s {
 	cifs_dirent_t de;
 };
 
-static void cifs_build_stat(struct cifs_dirinfo_s *di, cifs_stat_p st) {
+static void cifs_build_stat(struct cifs_find_dirinfo_s *di, cifs_stat_p st) {
 	st->creation_time = di->creation_time;
 	st->access_time = di->access_time;
 	st->write_time = di->write_time;
 	st->change_time = di->change_time;
 	st->file_size = di->file_size;
 	st->allocation_size = di->allocation_size;
-	st->attributes = di->attributes;
-	st->is_directory = di->attributes & FILE_ATTRIBUTE_DIRECTORY ? 1 : 0;
+	st->attributes = di->ext_file_attributes;
+	st->is_directory = di->ext_file_attributes & FILE_ATTRIBUTE_DIRECTORY ? 1 : 0;
 }
 
-static void cifs_build_dirent(cifs_connect_p c, struct cifs_dirinfo_s *di, cifs_dirent_p de) {
+static void cifs_build_dirent(cifs_connect_p c, struct cifs_find_dirinfo_s *di, cifs_dirent_p de) {
 	cifs_build_stat(di, &de->st);
 	if (c->capabilities & CAP_UNICODE) {
-		cifs_cp_block(cifs_cp_ucs_to_sys, de->name, NAME_MAX, di->name, di->name_len);
+		cifs_cp_block(cifs_cp_ucs_to_sys, de->name, NAME_MAX, di->name, di->name_length);
 	} else {
-		cifs_cp_block(cifs_cp_oem_to_sys, de->name, NAME_MAX, di->name, di->name_len);
+		cifs_cp_block(cifs_cp_oem_to_sys, de->name, NAME_MAX, di->name, di->name_length);
 	}
 }
 
 static int cifs_find_first_req(cifs_connect_p c, const char *path, const char *mask) {
 	cifs_trans_req(c, SMBtrans2, NULL, 1, TRANSACT2_FINDFIRST);
     cifs_buf_p b = c->o->b;
-    CIFS_BUF_STRUCT(b, cifs_find_first_req_s, f);
+    CIFS_WRITE_STRUCT(b, cifs_find_first_req_s, f);
 
     f->search_attributes = 0x37;
     f->search_count = -1;
@@ -74,7 +74,7 @@ static int cifs_find_first_req(cifs_connect_p c, const char *path, const char *m
 static int cifs_find_next_req(cifs_connect_p c, int sid) {
     cifs_trans_req(c, SMBtrans2, NULL, 1, TRANSACT2_FINDNEXT);
     cifs_buf_p b = c->o->b;
-    CIFS_BUF_STRUCT(b, cifs_find_next_req_s, f);
+    CIFS_WRITE_STRUCT(b, cifs_find_next_req_s, f);
     f->sid = sid;
     f->search_count = -1;	
     f->information_level = SMB_FIND_DIRECTORY_INFO;
@@ -98,8 +98,10 @@ cifs_dir_p cifs_find(cifs_connect_p c, const char *path, const char *mask) {
 	NEW_STRUCT(d);
 	
 	if (d == NULL) return NULL;
+
+    d->t = cifs_trans_new();
 	
-	if (cifs_trans_alloc(&d->t)) {
+	if (d->t == NULL) {
 		FREE_STRUCT(d);
 		return NULL;
 	}
@@ -108,19 +110,19 @@ cifs_dir_p cifs_find(cifs_connect_p c, const char *path, const char *mask) {
 	
 	cifs_find_first_req(c, path, mask);
 	
-	if (cifs_trans_request(c, &d->t)) {
-		cifs_trans_free(&d->t);
+	if (cifs_trans_request(c, d->t)) {
+		cifs_trans_free(d->t);
 		FREE_STRUCT(d);
 		return NULL;
 	}
 
-	cifs_log_trans("findfirst", &d->t);
+	cifs_log_trans("findfirst", d->t);
     
-    CIFS_BUF_STRUCT(d->t.param, cifs_find_first_res_s, ff);
+    CIFS_READ_STRUCT(d->t->param, cifs_find_first_res_s, ff);
     
 	d->end = ff->end_of_search;
 	d->sid = ff->sid;
-	d->buf = d->t.data;
+	d->buf = d->t->data;
 	d->count = ff->search_count;
 
     d->path = cifs_buf_new(PATH_MAX + NAME_MAX + 2);
@@ -147,22 +149,22 @@ loop:
 		cifs_find_next_req(f->c, f->sid);
 		
 		if (cifs_send(f->c)) return NULL;
-		if (cifs_trans_recv(f->c, &f->t)) return NULL;
+		if (cifs_trans_recv(f->c, f->t)) return NULL;
 
-		cifs_log_trans("findnext", &f->t);
+		cifs_log_trans("findnext", f->t);
 
-        CIFS_BUF_STRUCT(f->t.param, cifs_find_next_res_s, fn);
+        CIFS_READ_STRUCT(f->t->param, cifs_find_next_res_s, fn);
 
 		f->end = fn->end_of_search;
 		f->count = fn->search_count;
-		f->buf = f->t.data;
+		f->buf = f->t->data;
 		
 		if (f->count == 0) {
 			errno = ENOENT;
 			return NULL;
 		}
 	}
-    CIFS_BUF_STRUCT_PTR(f->buf, cifs_dirinfo_s, di);
+    CIFS_BUF_STRUCT(f->buf, cifs_find_dirinfo_s, di);
 	cifs_build_dirent(f->c, di, &f->de);
     cifs_buf_inc(f->buf, di->next_entry_offset);
 	f->count--;
@@ -173,40 +175,42 @@ loop:
 }
 
 int cifs_closedir(cifs_dir_p f) {
-	cifs_trans_free(&f->t);
-    cifs_buf_free(f->path);
+    int res = 0;
 	if (!f->end) {
 		cifs_find_close_req(f->c, f->sid);
-		if (cifs_request(f->c)) return -1;
+		res = cifs_request(f->c);
 	}
-	return 0;
+	cifs_trans_free(f->t);
+    cifs_buf_free(f->path);
+  	free(f);
+	return res;
 }
 
 int cifs_stat(cifs_connect_p c, const char *path, cifs_stat_p st) {
-	cifs_trans_t tr;
+	cifs_trans_p tr = cifs_trans_new();
 
-	if (cifs_trans_alloc(&tr)) return -1;
+	if (tr == NULL) return -1;
 	cifs_find_first_req(c, path, NULL);	
-	if (cifs_trans_request(c, &tr)) {
-		cifs_trans_free(&tr);
+	if (cifs_trans_request(c, tr)) {
+		cifs_trans_free(tr);
 		return -1;
 	}
+	cifs_log_trans("stat", tr);
 
-	cifs_log_trans("info", &tr);
-    CIFS_BUF_STRUCT(tr.param, cifs_find_first_res_s, ff);
+    CIFS_READ_STRUCT(tr->param, cifs_find_first_res_s, ff);
    
 	if (ff->search_count != 1) {		
 		if (!ff->end_of_search) {
 			cifs_find_close_req(c, ff->sid);
 			cifs_request(c);
 		}
-		cifs_trans_free(&tr);
+		cifs_trans_free(tr);
 		errno = EMLINK;
 		return -1;
 	}
-    CIFS_BUF_STRUCT(tr.data, cifs_dirinfo_s, di);    
+    CIFS_READ_STRUCT(tr->data, cifs_find_dirinfo_s, di);    
 	cifs_build_stat(di, st);
-	cifs_trans_free(&tr);
+	cifs_trans_free(tr);
 	return 0;
 }
 

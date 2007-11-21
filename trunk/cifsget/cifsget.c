@@ -37,8 +37,24 @@ usage: cifsget OPTION | URI | UNC | SHORT ...\n\
 ");
 }
 
+int cifs_print_status(const char *fmt, ...) {
+	static int len = 0;
+	int res;
+	va_list ap;
+	va_start(ap, fmt);
+	res = vprintf(fmt, ap);
+	va_end(ap);
+	while (len-- > res) putchar(' ');
+	putchar('\r');
+	fflush(stdout);
+	len = res;
+	return res;
+}
+
 cifs_flow_p flow;
 int opt_dirsize = 0;
+
+/* LIST */
 
 void cifs_print_file(cifs_dirent_p st) {
 	printf("%6s %s%s\n", (!st->st.is_directory || opt_dirsize) ? cifs_hsize(st->st.file_size, NULL) : " <dir>" , st->name, st->st.is_directory ? "/":"");
@@ -62,20 +78,6 @@ int cifs_print_node(cifs_node_p n) {
 	}
 	printf(" %s %s\t%s\n", type, n->name, n->comment);
 	return 0;
-}
-
-int cifs_print_status(const char *fmt, ...) {
-	static int len = 0;
-	int res;
-	va_list ap;
-	va_start(ap, fmt);
-	res = vprintf(fmt, ap);
-	va_end(ap);
-	while (len-- > res) putchar(' ');
-	putchar('\r');
-	fflush(stdout);
-	len = res;
-	return res;
 }
 
 int cifs_get_size_dir(cifs_connect_p c, const char *path, const char *name, uint64_t *size) {
@@ -113,133 +115,6 @@ int cifs_calc_size(cifs_connect_p c, cifs_dirent_p e) {
 		}
 	}
 	return 0;
-}
-
-int cifs_download_file(cifs_connect_p c, cifs_dirent_p e, const char *dst) {
-	int fid = -1;
-	int fd = -1;
-	static char buf[64*1024];
-	int res, len;
-	off_t off, rem;
-
-	if (!cifs_connected(c)) {
-		errno = ENOTCONN;
-		return -1;
-	}
-	
-	fid = cifs_open(c, e->path, O_RDONLY);
-	if (fid < 0) {
-		perror(e->path);
-		goto err;
-	}
-	
-	fd = open(dst, O_CREAT | O_WRONLY | O_LARGEFILE, 0644);
-	if (fd < 0) {
-		perror(dst);
-		goto err;
-	}
-	
-	off = lseek(fd, 0, SEEK_END);
-	if (off == (off_t)-1) {
-		perror(dst);
-		goto err;
-	}
-
-	rem = e->st.file_size - off;
-
-	char size_str[10];
-
-	cifs_hsize(e->st.file_size, size_str);
-
-	while (rem > 0) {
-		len  = (rem < sizeof(buf))?rem:sizeof(buf);
-		res = cifs_read(c, fid, buf, len, off);
-		if (res < 0) {
-			perror(e->path);
-			goto err;
-		}
-		if (res > 0) {			
-			off += res;
-			rem -= res;
-			if (write(fd, buf, res) != res)	{
-				perror(dst);
-				goto err;
-			}
-		}
-		if (cifs_flow(flow, res) && cifs_log_level >= CIFS_LOG_NORMAL) {
-			char speed_str[10];
-			cifs_print_status("%6s of %6s (%.1f%%) %6s/s ETA: %s ", 
-					cifs_hsize(off, NULL), 
-					size_str,
-					(double)off * 100.0 / e->st.file_size, 
-					cifs_hsize(flow->speed, speed_str), 
-					flow->speed > 0 ? cifs_htime(rem / flow->speed) : "???");
-		}
-	}
-	if (cifs_log_level >= CIFS_LOG_NORMAL) {
-		cifs_print_status("");
-	}
-	close(fd);
-	cifs_close(c, fid);
-	return 0;
-
-err:
-	if (fid > 0) cifs_close(c, fid);
-	if (fd > 0) close(fd);
-	return -1;
-}
-
-int cifs_download_dir(cifs_connect_p c, cifs_dirent_p src, const char *dst) {
-	char *dname;
-	cifs_dir_p d;	
-	cifs_dirent_p e;
-	int res = -1;
-
-	if (!cifs_connected(c)) {
-		errno = ENOTCONN;
-		goto err;
-	}	
-
-	if (mkdir(dst, 0755) && errno != EEXIST) {
-		perror(dst);
-		goto err;
-	}
-	
-	d = cifs_opendir(c, src->path);
-	
-	if (!d) {
-		perror(src->path);
-		return -1;
-	}
-	
-	while ((e = cifs_readdir(d))) {
-		asprintf(&dname, "%s/%s", dst, e->name);
-		
-		cifs_print_file(e);
-		
-		if (e->st.is_directory) {
-			if (cifs_download_dir(c, e, dname)) {
-				perror(e->path);
-				if (!cifs_connected(c)) {
-					errno = ENOTCONN;
-					goto err;
-				}
-			}			
-		} else {
-			if (cifs_download_file(c, e, dname)) {
-				perror(e->path);
-				if (!cifs_connected(c)) {
-					errno = ENOTCONN;
-					goto err;
-				}
-			}
-		}
-		free(dname);
-	}
-	res = 0;
-err:
-	cifs_closedir(d);
-	return res;
 }
 
 int cifs_list_dir(cifs_connect_p c, const char *path) {
@@ -312,7 +187,7 @@ int cifs_list_node(cifs_connect_p c) {
 	return 0;
 }
 
-int cifs_list(cifs_connect_p c, cifs_dirent_p di) {	
+int cifs_list(cifs_connect_p c, cifs_dirent_p di) {
 	if (di) {
 		if (di->st.is_directory) {
 		    printf("%s:\n", di->name);
@@ -324,35 +199,6 @@ int cifs_list(cifs_connect_p c, cifs_dirent_p di) {
 	} else {
 		cifs_list_node(c);
 	}
-	return 0;
-}
-
-char *outfile = NULL, *outdir = ".";
-
-int cifs_download(cifs_connect_p c, cifs_dirent_p de) {
-	char *dst;
-			
-	if (!outfile) {
-		asprintf(&dst, "%s/%s", outdir, de->name);
-	} else {
-		if (outfile[0] == '/') {
-			dst = strdup(outfile);
-		} else {
-			asprintf(&dst, "%s/%s", outdir, outfile);
-		}
-	}
-	
-	cifs_print_file(de);
-	
-	if (de->st.is_directory) {
-		cifs_download_dir(c, de, dst);
-	} else {
-		cifs_download_file(c, de, dst);
-	}		
-
-	free(dst);
-	free(outfile);
-	outfile = NULL;
 	return 0;
 }
 
@@ -398,8 +244,149 @@ int cifs_list_uri(cifs_uri_p uri) {
 	return 0;
 }
 
-char *putname = NULL;
+/* DOWNLOAD */
 
+int cifs_download_file(cifs_connect_p c, cifs_dirent_p e, const char *dst) {
+	int fid = -1;
+	int fd = -1;
+	static char buf[64*1024];
+	int res, len;
+	off_t off, rem;
+	
+	fid = cifs_open(c, e->path, O_RDONLY, NULL);
+	if (fid < 0) {
+		perror(e->path);
+		goto err;
+	}
+	
+	fd = open(dst, O_CREAT | O_WRONLY | O_LARGEFILE, 0644);
+	if (fd < 0) {
+		perror(dst);
+		goto err;
+	}
+	
+	off = lseek(fd, 0, SEEK_END);
+	if (off == (off_t)-1) {
+		perror(dst);
+		goto err;
+	}
+
+	rem = e->st.file_size - off;
+
+	char size_str[10];
+
+	cifs_hsize(e->st.file_size, size_str);
+
+	while (rem > 0) {
+		len  = (rem < sizeof(buf))?rem:sizeof(buf);
+		res = cifs_read(c, fid, buf, len, off);
+		if (res < 0) {
+			perror(e->path);
+			goto err;
+		}
+		if (res > 0) {			
+			off += res;
+			rem -= res;
+			if (write(fd, buf, res) != res)	{
+				perror(dst);
+				goto err;
+			}
+		}
+		if (cifs_flow(flow, res) && cifs_log_level >= CIFS_LOG_NORMAL) {
+			char speed_str[10];
+			cifs_print_status("%6s of %6s (%.1f%%) %6s/s ETA: %s ", 
+					cifs_hsize(off, NULL), 
+					size_str,
+					(double)off * 100.0 / e->st.file_size, 
+					cifs_hsize(flow->speed, speed_str), 
+					flow->speed > 0 ? cifs_htime(rem / flow->speed) : "???");
+		}
+	}
+	if (cifs_log_level >= CIFS_LOG_NORMAL) {
+		cifs_print_status("");
+	}
+	close(fd);
+	cifs_close(c, fid);
+	return 0;
+
+err:
+	if (fid > 0) cifs_close(c, fid);
+	if (fd > 0) close(fd);
+	return -1;
+}
+
+int cifs_download_dir(cifs_connect_p c, cifs_dirent_p src, const char *dst) {
+	char *dname;
+	cifs_dir_p d;	
+	cifs_dirent_p e;
+	int res = -1;
+
+	if (mkdir(dst, 0755) && errno != EEXIST) {
+		perror(dst);
+		goto err;
+	}
+	
+	d = cifs_opendir(c, src->path);
+	
+	if (!d) {
+		perror(src->path);
+		return -1;
+	}
+	
+	while ((e = cifs_readdir(d))) {
+		asprintf(&dname, "%s/%s", dst, e->name);
+		
+		cifs_print_file(e);
+		
+		if (e->st.is_directory) {
+			if (cifs_download_dir(c, e, dname)) {
+				perror(e->path);
+			}			
+		} else {
+			if (cifs_download_file(c, e, dname)) {
+				perror(e->path);
+			}
+		}
+		free(dname);
+	}
+	res = 0;
+err:
+	cifs_closedir(d);
+	return res;
+}
+
+char *outfile = NULL, *outdir = ".";
+
+int cifs_download(cifs_connect_p c, cifs_dirent_p de) {
+	char *dst;
+			
+	if (!outfile) {
+		asprintf(&dst, "%s/%s", outdir, de->name);
+	} else {
+		if (outfile[0] == '/') {
+			dst = strdup(outfile);
+		} else {
+			asprintf(&dst, "%s/%s", outdir, outfile);
+		}
+	}
+	
+	cifs_print_file(de);
+	
+	if (de->st.is_directory) {
+		cifs_download_dir(c, de, dst);
+	} else {
+		cifs_download_file(c, de, dst);
+	}		
+
+	free(dst);
+	free(outfile);
+	outfile = NULL;
+	return 0;
+}
+
+/* UPLOAD */
+
+char *putname = NULL;
 
 int cifs_upload_file(cifs_connect_p c, const char *src, cifs_dirent_p dst) {
 	int fid = -1;
@@ -407,13 +394,8 @@ int cifs_upload_file(cifs_connect_p c, const char *src, cifs_dirent_p dst) {
 	static char buf[64*1024];
 	int res, len;
 	off_t off, rem, size;
-
-	if (!cifs_connected(c)) {
-		errno = ENOTCONN;
-		return -1;
-	}
 	
-	fid = cifs_open(c, dst->path, O_WRONLY);
+	fid = cifs_open(c, dst->path, O_WRONLY, NULL);
 	if (fid < 0) {
 		perror(dst->path);
 		goto err;

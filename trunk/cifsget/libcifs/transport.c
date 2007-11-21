@@ -1,8 +1,8 @@
 #include "includes.h"
 
 void cifs_packet_log(cifs_packet_p p) {
-	cifs_log_debug("%s command %02X E %d_%d WC %d BC %d\n",
-            (p->h->flags & FLAG_REPLY) ?"In ":"Out",
+	cifs_log_debug("%c cmd %02X err %d:%d WC %d BC %d\n",
+            (p->h->flags & FLAG_REPLY) ?'I':'O',
 			p->h->cmd,
 			p->h->error_class, p->h->error,
 			p->h->wc, cifs_buf_size(p->b));
@@ -16,7 +16,7 @@ int cifs_packet_parse(cifs_packet_p packet) {
     int size = cifs_buf_size(packet->p);
     int wc, bc;
 	if (size <  sizeof(struct cifs_header_s)) return -1;
-	if (memcmp((char*)packet->h->magic, CIFS_MAGIC, 4)) return -1;
+	if (memcmp(packet->h->magic, CIFS_MAGIC, 4)) return -1;
     wc = packet->h->wc;
     if (size < sizeof(struct cifs_header_s) + wc*2) return -1;
     bc = packet->h->w[wc];
@@ -44,7 +44,7 @@ void cifs_packet_setup(cifs_packet_p packet, int cmd, int words_size) {
     packet->h->cmd = cmd;
     int wc = (words_size + 1) / 2;
     packet->h->wc = wc;
-    int off = cifs_buf_off(packet->p, (char *)(packet->h->w+wc+1));
+    int off = cifs_buf_off(packet->p, packet->h->w + wc + 1);
     cifs_buf_setup(packet->b, cifs_buf_ptr(packet->p, off), cifs_buf_size(packet->p) - off);
 }
 
@@ -143,7 +143,6 @@ int cifs_nbt_session(int sock, const char *local, const char *remote) {
 	return -1;
 }
 
-
 int cifs_resolve(const char *host, struct in_addr *addr) {
 	struct hostent *hp;
 	/* IP */
@@ -207,7 +206,6 @@ cifs_connect_p cifs_connect_new(int sock, const char *name) {
     c->ipc = -1;
 
 	c->name = strdup(name);
-	c->connected = 1;
 	return c;
 }
 
@@ -217,20 +215,11 @@ void cifs_connect_close(cifs_connect_p c) {
 	free(c);
 }
 
-int cifs_connected(cifs_connect_p c) {
-	return c->connected;
-}
-
 size_t cifs_send_raw(cifs_connect_p c, void *buf, size_t count) {
 	int r;
 	char *p = buf;
     int len = count;
-    	
-	if (!c->connected) {
-		errno = ENOTCONN;
-		return -1;
-	}
-    	
+
 	while (len) {
 		r = send(c->sock, p, len, 0);
 		if (r < 0) return -1;
@@ -243,11 +232,6 @@ size_t cifs_send_raw(cifs_connect_p c, void *buf, size_t count) {
 int cifs_send(cifs_connect_p c) {
 	int len, res;
     void *p;
-
-	if (!c->connected) {
-		errno = ENOTCONN;
-		return -1;
-	}
 
 	len = cifs_packet_unparse(c->o);
     p = cifs_buf_ptr(c->o->p, 0);
@@ -278,10 +262,6 @@ int cifs_recv_skip_sock(int sock, int size) {
 }
 
 int cifs_recv_skip(cifs_connect_p c, int size) {
-	if (!c->connected) {
-		errno = ENOTCONN;
-		return -1;
-	}
 	if (cifs_recv_skip_sock(c->sock, size)) return -1;	
 	return 0;
 }
@@ -290,11 +270,6 @@ int cifs_recv_size(cifs_connect_p c) {
 	uint32_t size;
 	char *p;
 	int l, r, type;
-
-	if (!c->connected) {
-		errno = ENOTCONN;
-		return -1;
-	}
 
 	do {
 		p = (char*)&size;
@@ -351,11 +326,6 @@ size_t cifs_recv_raw(cifs_connect_p c, void* buf, size_t len) {
 
 int cifs_recv(cifs_connect_p c) {
 	int res, size;
-
-	if (!c->connected) {
-		errno = ENOTCONN;
-		return -1;
-	}
 
     cifs_buf_p buf = c->i->p;
 
@@ -417,11 +387,6 @@ int cifs_request(cifs_connect_p c) {
 
 int cifs_recv_async(cifs_connect_p c) {
 	int size;
-
-	if (!c->connected) {
-		errno = ENOTCONN;
-		return -1;
-	}	
     
     cifs_buf_p buf = c->i->p;
 	

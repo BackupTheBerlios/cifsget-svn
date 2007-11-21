@@ -9,7 +9,7 @@
 #define ALLOC_STRUCT(t) (t*)calloc(1, sizeof(t))
 
 typedef struct cifs_buf_s {
-    char *b, *p, *l;
+    void *b, *p, *l;
     int s;
     char buf[0];
 } cifs_buf_t;
@@ -26,14 +26,14 @@ int cifs_buf_limit(cifs_buf_p buf, int size);
 // test
 #define cifs_buf_end(buf) ((buf)->l == (buf)->p)
 #define cifs_buf_range(buf, off, len) (((buf)->b + (off) < (buf)->b) || ((buf)->b + (off) + (len) > (buf)->l))
-#define cifs_buf_rangep(buf, ptr, len) (((ptr) < (buf)->b) || (((ptr) + (len)) > (buf)->l))
+#define cifs_buf_rangep(buf, ptr, len) (((void*)(ptr) < (buf)->b) || (((void*)(ptr) + (len)) > (buf)->l))
 
 // length
 #define cifs_buf_len(buf) ((buf)->p - (buf)->b)
 #define cifs_buf_left(buf) ((buf)->l - (buf)->p)
 
 #define cifs_buf_ptr(buf, off) ((buf)->b + (off))
-#define cifs_buf_off(buf, ptr) ((ptr) - (buf)->b)
+#define cifs_buf_off(buf, ptr) ((void*)(ptr) - (buf)->b)
 
 
 // pointer
@@ -42,22 +42,22 @@ int cifs_buf_limit(cifs_buf_p buf, int size);
 #define cifs_buf_inc(buf, i) ((buf)->p+=(i))
 #define cifs_buf_set(buf, i) ((buf)->p = (buf)->b + (i))
 
+#define cifs_buf_cur_type(buf, type) ((type)(buf)->p)
 
-#define cifs_write_byte(b, v)   (*((b)->p)++ = v)
-#define cifs_write_word(b, v)   (*((uint16_t*)((b)->p)) = v, (b)->p+=2)
-#define cifs_write_long(b, v)   (*((uint32_t*)((b)->p)) = v, (b)->p+=4)
+#define cifs_write_byte(b, v)   (*cifs_buf_cur_type(b, uint8_t*) = v, cifs_buf_inc(b, 1))
+#define cifs_write_word(b, v)   (*cifs_buf_cur_type(b, uint16_t*) = v, cifs_buf_inc(b, 2))
+#define cifs_write_long(b, v)   (*cifs_buf_cur_type(b, uint32_t*) = v, cifs_buf_inc(b, 4))
 
 static inline void cifs_write_str(cifs_buf_p buf, const char *s) {
 	while (*s) {
-		*(buf->p)++ = *s++;
+		*((char*)(buf->p)) = *s;
+        s++;
+        buf->p++;
 	}
 }
 #define cifs_write_strz(buf, str) do { cifs_write_str(buf, str); cifs_write_byte(buf, 0); } while(0)
 
-#define cifs_write_buf(buf, ptr, cnt) do { \
-    memcpy(buf->p, ptr, cnt); \
-    buf->p += cnt; \
-} while (0); \
+#define cifs_write_buf(buf, ptr, cnt) do { memcpy(cifs_buf_cur(buf), ptr, cnt); cifs_buf_inc(buf, cnt); } while (0)
 
 int cifs_write_oem(cifs_buf_p dst, const char *src);
 int cifs_write_ucs(cifs_buf_p dst, const char *src);
@@ -69,10 +69,9 @@ int cifs_write_path_ucs (cifs_buf_p buf, const char *path);
 #define cifs_write_path_oemz(buf, path) do { cifs_write_path_oem(buf, path); cifs_write_byte(buf, 0); } while(0)
 #define cifs_write_path_ucsz(buf, path) do { cifs_write_path_ucs(buf, path); cifs_write_word(buf, 0); } while(0)
 
-#define CIFS_BUF_STRUCT_PTR(buf, type, name) struct type *name = (struct type *) (buf)->p;
+#define CIFS_BUF_STRUCT(buf, type, name) struct type *name = (struct type *) cifs_buf_cur(buf)
 
-#define CIFS_BUF_STRUCT(buf, type, name)  \
-    struct type *name = (struct type *) (buf)->p; \
-    (buf)->p += sizeof(struct type);
+#define CIFS_READ_STRUCT(buf, type, name) CIFS_BUF_STRUCT(buf, type, name); cifs_buf_inc(buf, sizeof(struct type))
+#define CIFS_WRITE_STRUCT(buf, type, name) CIFS_READ_STRUCT(buf, type, name)
 
 #endif

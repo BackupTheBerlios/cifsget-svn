@@ -9,12 +9,11 @@
 
 typedef struct cifs_trans_s {
     cifs_buf_p setup, param, data;
-} cifs_trans_t;
-typedef cifs_trans_t *cifs_trans_p;
+} *cifs_trans_p;
 
 void cifs_log_trans(const char *name, cifs_trans_p trans);
 
-int cifs_trans_alloc(cifs_trans_p t);
+cifs_trans_p cifs_trans_new(void);
 void cifs_trans_free(cifs_trans_p t);
 
 void cifs_trans_req(cifs_connect_p c, int command, char *name, int setup_count, ...);

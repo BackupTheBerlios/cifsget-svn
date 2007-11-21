@@ -24,7 +24,6 @@ void cifs_trans_req(cifs_connect_p c, int command, char *name, int setup_count, 
 
 	if (name) {
 		if (c->capabilities & CAP_UNICODE) {
-            //cifs_write_align(o->b, 2);
             cifs_write_byte(o->b, 0);
             cifs_write_ucsz(o->b, name);
 		} else {
@@ -41,19 +40,28 @@ void cifs_trans_req(cifs_connect_p c, int command, char *name, int setup_count, 
     req->data_offset = cifs_packet_off_cur(o);
 }
 
-int cifs_trans_alloc(cifs_trans_p t) {
-	ZERO_STRUCTP(t);
+cifs_trans_p cifs_trans_new(void) {
+    cifs_trans_p t;
+    NEW_STRUCT(t);
+    if (t == NULL) {
+        return NULL;
+    }
     t->setup = cifs_buf_new(CIFS_TRANS_MAX_SETUP_COUNT);
     t->param = cifs_buf_new(CIFS_TRANS_MAX_PARAM_COUNT);
     t->data = cifs_buf_new(CIFS_TRANS_MAX_DATA_COUNT);
-	return 0;
+    if (t->setup == NULL || t->param == NULL || t->data == NULL) {
+        cifs_trans_free(t);
+        return NULL;
+    }
+	return t;
 }
 
 void cifs_trans_free(cifs_trans_p t) {
+    if (t == NULL) return;
     cifs_buf_free(t->setup);
     cifs_buf_free(t->param);
     cifs_buf_free(t->data); 
-	ZERO_STRUCTP(t);
+    free(t);
 }
 
 int cifs_trans_recv(cifs_connect_p c, cifs_trans_p t) {
@@ -115,7 +123,6 @@ err:
 
 
 int cifs_trans_request(cifs_connect_p c, cifs_trans_p t) {
-//	cifs_log_struct(PTR_PACKET_W(c->o), OTRANS);
 	if (cifs_send(c)) return -1;
 	if (cifs_trans_recv(c, t)) return -1;
 	return 0;

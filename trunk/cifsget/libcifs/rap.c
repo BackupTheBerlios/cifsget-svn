@@ -2,7 +2,7 @@
 
 struct cifs_enum_s {
 	cifs_connect_p c;
-	cifs_trans_t t;	
+	cifs_trans_p t;
     cifs_buf_p buf;
 	int count;
 	int type;
@@ -29,24 +29,25 @@ static cifs_enum_p cifs_rap_enum(cifs_connect_p c, int type) {
 	
 	NEW_STRUCT(e);
 	if (!e)	goto err;	
-	if (cifs_trans_alloc(&e->t)) goto err;
+    e->t = cifs_trans_new();
+	if (e->t == NULL) goto err;
 	
 	e->c = c;
 
 	if (cifs_tree_ipc(c)) goto err;
-	if (cifs_trans_request(c, &e->t)) goto err;
+	if (cifs_trans_request(c, e->t)) goto err;
     cifs_tree_set(c, -1);
 
-	cifs_log_trans("rapenum", &e->t);
+	cifs_log_trans("rapenum", e->t);
 
-    CIFS_BUF_STRUCT(e->t.param, cifs_rapenum_s, re);
+    CIFS_READ_STRUCT(e->t->param, cifs_rapenum_s, re);
 	
 	if (re->status) {
 		errno = EIO;
 		goto err;
 	}
 	
-	e->buf = e->t.data;
+	e->buf = e->t->data;
 	e->count = re->entry_count;
 	e->conv = re->convert;
 	e->type = type;
@@ -54,7 +55,7 @@ static cifs_enum_p cifs_rap_enum(cifs_connect_p c, int type) {
 	return e;
 	
 err:
-	cifs_trans_free(&e->t);
+	cifs_trans_free(e->t);
 	FREE_STRUCT(e);
 	return NULL;
 }
@@ -93,17 +94,15 @@ int cifs_enum_next(cifs_enum_p e, cifs_node_p n) {
 	ZERO_STRUCTP(n);
 	n->type = e->type;
 	if (e->type ==  CIFS_NODE_SHARE) {
-        CIFS_BUF_STRUCT(e->buf, cifs_shareenum_s, se);
+        CIFS_READ_STRUCT(e->buf, cifs_shareenum_s, se);
         cifs_cp_block(cifs_cp_oem_to_sys, n->name, sizeof(n->name), (char *)se->name, sizeof(se->name));
-        comm = cifs_buf_ptr(e->t.data, (se->comment & 0x0000FFFF) - e->conv);
-        //comm = e->t.data + (GET_SHAREENUM_COMMENT(e->cur) & 0x0000FFFF) - e->conv;
+        comm = cifs_buf_ptr(e->t->data, (se->comment & 0x0000FFFF) - e->conv);
         cifs_cp_tobuf(cifs_cp_oem_to_sys, n->comment, sizeof(n->comment), comm);
         n->attributes = se->type;
     } else { // CIFS_NODE_DOMAIN CIFS_NODE_SERVER
-        CIFS_BUF_STRUCT(e->buf, cifs_serverenum_s, se);
+        CIFS_READ_STRUCT(e->buf, cifs_serverenum_s, se);
         cifs_cp_block(cifs_cp_oem_to_sys, n->name, sizeof(n->name), (char *)se->name, sizeof(se->name));
-        comm = cifs_buf_ptr(e->t.data, (se->comment & 0x0000FFFF) - e->conv);
-        //comm = e->t.data + (GET_SERVERENUM_COMMENT(e->cur) & 0x0000FFFF) - e->conv;
+        comm = cifs_buf_ptr(e->t->data, (se->comment & 0x0000FFFF) - e->conv);
         cifs_cp_tobuf(cifs_cp_oem_to_sys, n->comment, sizeof(n->comment), comm);
         n->attributes = se->type;
 	}
@@ -112,7 +111,7 @@ int cifs_enum_next(cifs_enum_p e, cifs_node_p n) {
 }
 
 void cifs_enum_close(cifs_enum_p e) {
-	cifs_trans_free(&e->t);
+	cifs_trans_free(e->t);
 	FREE_STRUCT(e);	
 }
 

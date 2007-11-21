@@ -150,7 +150,7 @@ int cifs_open(cifs_connect_p c, const char *name, int flags) {
 #define GENERIC_WRITE         0x40000000
 #define GENERIC_READ          0x80000000
 
-int cifs_open(cifs_connect_p c, const char *name, int flags) {
+int cifs_open(cifs_connect_p c, const char *name, int flags, cifs_stat_p stat) {
     CALL_SETUP(SMBntcreateX, nt_createx, 0);
 
     req->andx.cmd = -1;
@@ -194,6 +194,15 @@ int cifs_open(cifs_connect_p c, const char *name, int flags) {
         req->name_length = cifs_buf_len(o->b);
 	}    
     if (cifs_request(c)) return -1;
+    if (stat != NULL) {
+        stat->creation_time = res->creation_time;
+        stat->access_time = res->access_time;
+        stat->write_time = res->write_time;
+        stat->change_time = res->change_time;
+        stat->file_size = res->file_size;
+        stat->allocation_size = res->allocation_size;
+        stat->attributes = res->ext_file_attributes;
+    }
     return res->fid;
 }
 

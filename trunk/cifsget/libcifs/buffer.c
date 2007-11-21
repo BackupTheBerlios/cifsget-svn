@@ -54,7 +54,7 @@ int cifs_write_ucs(cifs_buf_p dst, const char *src) {
 }
 
 
-int cifs_write_path_oem (cifs_buf_p buf, const char *path) {
+int cifs_write_path_oem(cifs_buf_p buf, const char *path) {
     int len;
     char *p = cifs_buf_cur(buf);
     len = cifs_write_oem(buf, path);
@@ -66,7 +66,7 @@ int cifs_write_path_oem (cifs_buf_p buf, const char *path) {
     return len;
 }
 
-int cifs_write_path_ucs (cifs_buf_p buf, const char *path) {
+int cifs_write_path_ucs(cifs_buf_p buf, const char *path) {
     int len;
     uint16_t *p = (uint16_t *)cifs_buf_cur(buf);
     len = cifs_write_ucs(buf, path);
