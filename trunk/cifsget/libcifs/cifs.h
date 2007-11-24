@@ -40,15 +40,15 @@ typedef cifs_dirent_t *cifs_dirent_p;
 typedef struct cifs_dir_s cifs_dir_t;
 typedef cifs_dir_t *cifs_dir_p;
 
-cifs_dir_p cifs_find(cifs_connect_p c, const char *path, const char *mask);
-
-cifs_dir_p cifs_opendir(cifs_connect_p c, const char *path);
+cifs_dir_p cifs_opendir(cifs_connect_p c, const char *path, const char *mask);
 
 cifs_dirent_p cifs_readdir(cifs_dir_p dir);
 
 int cifs_closedir(cifs_dir_p dir);
 
 int cifs_stat(cifs_connect_p c, const char *path, cifs_stat_p st);
+
+int cifs_mkdir(cifs_connect_p c, const char *pathname);
 
 time_t cifs_time(int64_t nt_time);
 

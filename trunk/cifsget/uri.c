@@ -1,3 +1,7 @@
+#include <stdlib.h>
+#include <string.h>
+#include "macros.h"
+
 #include "uri.h"
 
 #define HEX_TO_INT(c)	((c>='0' && c<='9')?(c-'0'):((c>='A' && c<='F')?(c-'A'+10):((c>='a' && c<='f')?(c-'a'+10):0)))
@@ -25,8 +29,6 @@ char *cifs_uri_unescape(char *s) {
 	*o = '\0';
 	return s;
 }
-
-// smb://[login[:password]@]host[:port][/share(/name)*]
 
 /*int cifs_parse_dest(char *s, cifs_uri_p uri) {
 	char *at, *co, *be, *en, *t;
@@ -70,57 +72,87 @@ char *cifs_uri_unescape(char *s) {
 #define SKIP_SLASH(p) while (*p && (*p == '/' || *p == '\\')) p++
 #define NEXT_SLASH(p) while (*p && *p != '/' && *p != '\\') p++
 
-int cifs_uri_parse(cifs_uri_p uri, const char *str) {
-	char *o, *s, *a, *b;
+cifs_uri_p cifs_uri_parse(const char *str) {
+	char *buf, *a, *b;
 
-	s = strdup(str);
-	cifs_uri_unescape(s);
+    cifs_uri_p uri;
+    NEW_STRUCT(uri);
 
-	a = strstr(s, "://");
-	if (a) {
-		if (!uri->scheme) uri->scheme = strndup(s, a - s);
-		a += 3;
-	} else {
-		a = s;
-	}
-	
-	o = uri->path = malloc(strlen(a) + 2);	
-	o[0] = '\0';
-	for (int i = 0 ; (b = strsep(&a, "/\\")) ; ) {
-		if (!b[0]) continue;		
-		switch (i) {
-			case 0:
-				if (!uri->name) uri->name = strdup(b);
-				if (!uri->addr) uri->addr = strdup(b);
-				break;
-			case 1:
-				if (!uri->tree) uri->tree = strdup(b);
-				break;
-			default:
-				strcat(strcat(o, "/"), b);
-				break;
-		}
-		i++;
-	}
-	a = strrchr(uri->path, '/');
-	if (a) {
-		if (!uri->file) uri->file = strdup(a+1);
-		if (!uri->dir) uri->dir = strndup(uri->path, a - uri->path);
-	} else {
-		uri->dir = strdup("");
-	}
-	free(s);
-	return 0;
+	buf = strdup(str);
+	cifs_uri_unescape(buf);
+    a = buf;
+    if (a[0] == '\\' && a[1] == '\\') {
+        /* UNC */
+        uri->scheme = URI_CIFS;
+        b = a;
+        while ((b = strchr(b, '\\'))) {
+            *b++ = '/';
+        }
+        a += 2;
+    } else {
+        b = strstr(a, "://");
+        if (b) {
+            if (!strncmp(a, "file", b-a)) {
+                uri->scheme = URI_FILE;
+            } else if (!strncmp(a, "cifs", b-a) || !strncmp(a, "smb", b-a)) {
+                uri->scheme = URI_CIFS;
+            } else {
+                goto err;
+            }
+            a = b+3;
+        } else {
+            uri->scheme = URI_FILE;
+            uri->path = buf;
+            return uri;
+        }        
+    }
+
+    if (uri->scheme != URI_FILE) {
+        b = strchr(a, '/');
+        if (b) {
+            uri->host = strndup(a, b-a);
+            a = b+1;
+        } else {
+            uri->host = strdup(a);
+            a += strlen(a);
+        }
+        uri->addr = strdup(uri->host);
+    }
+
+    if (a[0] && uri->scheme == URI_CIFS) {
+        b = strchr(a, '/');
+        if (b) {
+            uri->tree = strndup(a, b-a);
+            a = b+1;
+        } else {
+            uri->tree = strdup(a);
+            a += strlen(a);
+        }
+    }
+    uri->path = strdup(a);
+    b = strrchr(a, '/');
+    if (b) {
+        uri->file = strdup(b+1);
+        uri->dir = strndup(a, b-a);
+    } else {
+        uri->file = strdup(a);
+        uri->dir = strdup("");
+    }
+	free(buf);
+	return uri;
+err:
+    free(buf);
+    free(uri);
+    return NULL;
 }
 
 void cifs_uri_free(cifs_uri_p uri) {
-	free(uri->scheme);
-	free(uri->name);
+	free(uri->host);
 	free(uri->tree);
 	free(uri->path);
 	free(uri->file);
 	free(uri->dir);
-	free(uri->login);
+	free(uri->user);
 	free(uri->password);
 	free(uri->addr);
 	ZERO_STRUCTP(uri);

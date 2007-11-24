@@ -39,31 +39,29 @@ static int cifs_find_first_req(cifs_connect_p c, const char *path, const char *m
 	cifs_trans_req(c, SMBtrans2, NULL, 1, TRANSACT2_FINDFIRST);
     cifs_buf_p b = c->o->b;
     CIFS_WRITE_STRUCT(b, cifs_find_first_req_s, f);
-
+    
     f->search_attributes = 0x37;
     f->search_count = -1;
     f->flags = FLAG_TRANS2_FIND_CLOSE_IF_END;
     f->information_level = SMB_FIND_DIRECTORY_INFO;
     f->search_storage_type = 0;
 	if (c->capabilities & CAP_UNICODE) {
-		if (path && path[0]) {
-            cifs_write_path_ucs(b, "/");
-            cifs_write_path_ucs(b, path);
-		}
-		if (mask && mask[0]) {
-            cifs_write_path_ucs(b, "/");
+        cifs_write_path_ucs(b, path);
+        if (mask && mask[0]) {
+            cifs_write_path_ucs(b, "\\");
             cifs_write_path_ucs(b, mask);
-		}
+		} else {
+            cifs_write_path_ucs(b, "\\*");
+        }
         cifs_write_word(b, 0);
 	} else {
-		if (path && path[0]) {
-            cifs_write_path_oem(b, "/");
-            cifs_write_path_oem(b, path);
-		}        
+        cifs_write_path_oem(b, path);
 		if (mask && mask[0]) {
-            cifs_write_path_oem(b, "/");
+            cifs_write_path_oem(b, "\\");
             cifs_write_path_oem(b, mask);
-		}
+		} else {
+            cifs_write_path_oem(b, "\\*");
+        }
         cifs_write_byte(b, 0);
 	}
     c->o->w->transaction_req.total_param_count = cifs_buf_len(b);
@@ -92,7 +90,7 @@ static int cifs_find_close_req(cifs_connect_p c, int sid) {
 	return 0;
 }
 
-cifs_dir_p cifs_find(cifs_connect_p c, const char *path, const char *mask) {
+cifs_dir_p cifs_opendir(cifs_connect_p c, const char *path, const char *mask) {
 	cifs_dir_p d;
 
 	NEW_STRUCT(d);
@@ -133,10 +131,6 @@ cifs_dir_p cifs_find(cifs_connect_p c, const char *path, const char *mask) {
 	d->de.name = cifs_buf_cur(d->path);
 	
 	return d;
-}
-
-cifs_dir_p cifs_opendir(cifs_connect_p c, const char *path) {
-	return cifs_find(c, path, "*");
 }
 
 cifs_dirent_p cifs_readdir(cifs_dir_p f) {
@@ -199,7 +193,7 @@ int cifs_stat(cifs_connect_p c, const char *path, cifs_stat_p st) {
 
     CIFS_READ_STRUCT(tr->param, cifs_find_first_res_s, ff);
    
-	if (ff->search_count != 1) {		
+	if (ff->search_count != 1) {
 		if (!ff->end_of_search) {
 			cifs_find_close_req(c, ff->sid);
 			cifs_request(c);

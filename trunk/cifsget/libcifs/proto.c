@@ -14,11 +14,10 @@ int cifs_negotiate(cifs_connect_p c) {
 
     if (cifs_request(c)) return -1;
 
-    c->session_key = res->session_key;
-	
+
+    c->session_key = res->session_key;	
 	c->max_buffer_size = res->max_buffer_size;
 	if (c->max_buffer_size > CIFS_MAX_BUFFER) c->max_buffer_size = CIFS_MAX_BUFFER;
-	
 	c->max_raw_size = res->max_raw_size;
 	if (c->max_raw_size > CIFS_MAX_RAW) c->max_raw_size = CIFS_MAX_RAW;
 	
@@ -27,7 +26,8 @@ int cifs_negotiate(cifs_connect_p c) {
 	c->time = cifs_time(res->time);
 	c->zone = res->zone * 60;
 
-	cifs_log_verbose("server time: UTC %+d %s\n", c->zone/3600, ctime(&c->time));
+    cifs_log_verbose("max buffer %d raw %d cap %lX \n", res->max_buffer_size, res->max_raw_size, res->capabilities);
+    cifs_log_verbose("server time: UTC %+d %s\n", c->zone/3600, ctime(&c->time));
 
 	//c->capabilities &= !CAP_UNICODE;
 	
@@ -301,6 +301,25 @@ size_t cifs_read(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t of
 	return cifs_read_andx_recv(c, buf, count);
 }
 
+cifs_buf_p cifs_write_andx_req(cifs_connect_p c, int fid, uint64_t offset) {
+    REQUEST_SETUP(SMBwriteX, writex, 0);
+    req->andx.cmd = -1;	
+    req->fid = fid;
+    req->offset = offset;
+    req->offset_high = offset>>32;
+    req->data_offset = cifs_packet_off_cur(o);	
+    return o->b;    
+}
+
+size_t cifs_write_andx_res(cifs_connect_p c) {
+    RESPONSE_SETUP(writex);
+    return res->count;
+}
+
+int cifs_write_andx_send(cifs_connect_p c) {
+    c->o->w->writex_req.data_length = cifs_buf_len(c->o->b);
+    return cifs_send(c);
+}
 
 size_t cifs_write_andx(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t offset) {
     CALL_SETUP(SMBwriteX, writex, 0);
@@ -347,4 +366,9 @@ cifs_connect_p cifs_connect(const char *host, int port, const char *name, const 
     	}
     }
 	return c;
+}
+
+
+int cifs_mkdir(cifs_connect_p c, const char *pathname) {
+    return -1;
 }

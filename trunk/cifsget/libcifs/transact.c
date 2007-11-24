@@ -1,7 +1,7 @@
 #include "includes.h"
 
 void cifs_log_trans(const char *name, cifs_trans_p t) {
-	cifs_log_debug("trans %s setup %d param %d data %d\n", name, cifs_buf_len(t->setup), cifs_buf_len(t->param), cifs_buf_len(t->data));
+	cifs_log_debug("trans %s setup %d param %d data %d\n", name, cifs_buf_size(t->setup), cifs_buf_size(t->param), cifs_buf_size(t->data));
     cifs_log_buf_debug(t->setup, "setup");
     cifs_log_buf_debug(t->param, "param");
     cifs_log_buf_noisy(t->data, "data");
