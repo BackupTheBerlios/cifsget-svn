@@ -341,14 +341,17 @@ size_t cifs_write(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t o
     return cifs_write_andx(c, fid, buf, count, offset);
 }
 
-cifs_connect_p cifs_connect(const char *host, int port, const char *name, const char *tree) {
+cifs_connect_p cifs_connect(const char *addr, int port, const char *host, const char *tree) {
 	cifs_connect_p c;
 	struct in_addr address;
 	int sock;
-	if (cifs_resolve(host, &address)) return NULL;
-	sock = cifs_connect_sock(&address, port, "", name);
+    if (addr == NULL) {
+        addr = host;
+    }
+	if (cifs_resolve(addr, &address)) return NULL;
+	sock = cifs_connect_sock(&address, port, "", host);
 	if (sock < 0) return NULL;
-	c = cifs_connect_new(sock, name);
+	c = cifs_connect_new(sock, host);
 	if (c == NULL) {
 		close(sock);
 		return NULL;

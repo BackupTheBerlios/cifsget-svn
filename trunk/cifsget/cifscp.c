@@ -12,7 +12,6 @@
 #include "libcifs/cifs.h"
 #include "uri.h"
 #include "flow.h"
-#include "mirror.h"
 #include "human.h"
 
 void usage() {
@@ -22,7 +21,7 @@ usage: \n\
   cifscp [OPTION]... SOURCE DEST\n\
   cifscp [OPTION]... SOURCE... DIRECTORY\n\
   \n\
-  URI:    (smb|cifs)://[user[:password]@]host[[:ip]:port]/share/path\n\
+  URI:    (smb|cifs)://[user[:password]@]host[:[addr:]port]/share/path\n\
   UNC:    \\\\host\\share\\path\n\
   \n\
   OPTION:\n\

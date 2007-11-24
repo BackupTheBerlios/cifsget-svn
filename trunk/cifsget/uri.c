@@ -30,48 +30,6 @@ char *cifs_uri_unescape(char *s) {
 	return s;
 }
 
-/*int cifs_parse_dest(char *s, cifs_uri_p uri) {
-	char *at, *co, *be, *en, *t;
-	be = s;
-	en = strechr(be, NULL, '/');
-	at = strechr(be, en, '@');
-	if (at) {
-		co = strechr(be, at, ':');
-		if (co) {
-			uri->login = stredup(be, co);
-			uri->password = stredup(co+1, at);
-		} else {
-			uri->login = stredup(be, at);
-			uri->password = NULL;
-		}
-		co = strechr(at, en, ':');
-		if (co) {
-			uri->host = stredup(at, co);
-			uri->port = strtoul(co+1, &t, 10);
-			if (t<en) return -1;
-		} else {
-			uri->host = stredup(at, en);
-			uri->port = 0;
-		}
-	} else {
-		uri->login = NULL;
-		uri->password = NULL;
-		co = strechr(be, en, ':');
-		if (co) {
-			uri->host = stredup(be, co);
-			uri->port = strtoul(co+1, &t, 10);
-			if (t<en) return -1;
-		} else {
-			uri->host = stredup(be, en);
-			uri->port = 0;
-		}
-	}
-	return 0;
-}*/
-
-#define SKIP_SLASH(p) while (*p && (*p == '/' || *p == '\\')) p++
-#define NEXT_SLASH(p) while (*p && *p != '/' && *p != '\\') p++
-
 cifs_uri_p cifs_uri_parse(const char *str) {
 	char *buf, *a, *b;
 
@@ -106,15 +64,40 @@ cifs_uri_p cifs_uri_parse(const char *str) {
     }
 
     if (uri->scheme != URI_FILE) {
+        /*  [user[:password]@]host[:[addr:]port] */
+        char *at, *co;
         b = strchr(a, '/');
-        if (b) {
-            uri->host = strndup(a, b-a);
-            a = b+1;
+        if (b) *b = 0;
+        at = strchr(a, '@');
+        if (at) {
+            *at = 0;
+            co = strchr(a, ':');
+            if (co) {
+                uri->user = strndup(a, co-a);
+                uri->password = strdup(co+1);
+            } else {
+                uri->user = strdup(a);
+            }
+            *at = '@';
+            a=at+1;
+        }
+        co = strchr(a, ':');
+        if (co) {
+            uri->host = strndup(a, co-a);
+            at = strrchr(a, ':');
+            if (co != at) {
+                uri->addr = strndup(co+1, at-co-1);
+            }
+            uri->port = atoi(at+1);
         } else {
             uri->host = strdup(a);
-            a += strlen(a);
         }
-        uri->addr = strdup(uri->host);
+        if (b) {
+            *b = '/';
+            a = b+1;
+        } else {
+            a += strlen(a);            
+        }
     }
 
     if (a[0] && uri->scheme == URI_CIFS) {
