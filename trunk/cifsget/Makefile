@@ -1,4 +1,4 @@
-CFLAGS=-Os -g -std=c99 -Wall -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
+CFLAGS=-O0 -g -std=c99 -Wall -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
 LDFLAGS=-Llibcifs
 PREFIX=${HOME}
 
@@ -23,7 +23,7 @@ fusecifs: fusecifs.o
 	${CC} -o $@ $^ -lfuse -lcifs ${LDFLAGS}
 
 clean:
-	rm -f *.o cifsmirror cifsget tags fusecifs
+	rm -f *.o cifsmirror cifscp tags fusecifs
 	make -C libcifs clean
 
 distclean: clean

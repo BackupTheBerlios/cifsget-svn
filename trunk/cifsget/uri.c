@@ -102,8 +102,6 @@ cifs_uri_p cifs_uri_parse(const char *str) {
             a = b+3;
         } else {
             uri->scheme = URI_FILE;
-            uri->path = buf;
-            return uri;
         }        
     }
 

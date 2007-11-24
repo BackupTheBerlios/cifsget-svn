@@ -47,20 +47,16 @@ static int cifs_find_first_req(cifs_connect_p c, const char *path, const char *m
     f->search_storage_type = 0;
 	if (c->capabilities & CAP_UNICODE) {
         cifs_write_path_ucs(b, path);
-        if (mask && mask[0]) {
-            cifs_write_path_ucs(b, "\\");
-            cifs_write_path_ucs(b, mask);
-		} else {
-            cifs_write_path_ucs(b, "\\*");
+        if (mask) {
+            cifs_write_ucs(b, "\\");
+            cifs_write_ucs(b, mask);
         }
         cifs_write_word(b, 0);
 	} else {
         cifs_write_path_oem(b, path);
-		if (mask && mask[0]) {
-            cifs_write_path_oem(b, "\\");
-            cifs_write_path_oem(b, mask);
-		} else {
-            cifs_write_path_oem(b, "\\*");
+		if (mask) {
+            cifs_write_oem(b, "\\");
+            cifs_write_oem(b, mask);
         }
         cifs_write_byte(b, 0);
 	}
@@ -90,7 +86,7 @@ static int cifs_find_close_req(cifs_connect_p c, int sid) {
 	return 0;
 }
 
-cifs_dir_p cifs_opendir(cifs_connect_p c, const char *path, const char *mask) {
+cifs_dir_p cifs_mask(cifs_connect_p c, const char *path, const char *mask) {
 	cifs_dir_p d;
 
 	NEW_STRUCT(d);
@@ -131,6 +127,10 @@ cifs_dir_p cifs_opendir(cifs_connect_p c, const char *path, const char *mask) {
 	d->de.name = cifs_buf_cur(d->path);
 	
 	return d;
+}
+
+cifs_dir_p cifs_opendir(cifs_connect_p c, const char *path) {
+    return cifs_mask(c, path, "*");
 }
 
 cifs_dirent_p cifs_readdir(cifs_dir_p f) {

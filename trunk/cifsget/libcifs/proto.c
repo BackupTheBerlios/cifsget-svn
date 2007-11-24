@@ -116,7 +116,6 @@ int cifs_tree_ipc(cifs_connect_p c) {
     }
     return 0;
 }
-
 /*
 int cifs_open(cifs_connect_p c, const char *name, int flags) {
     cifs_packet_setup(c->o, SMBopen, 4);
@@ -368,7 +367,53 @@ cifs_connect_p cifs_connect(const char *host, int port, const char *name, const 
 	return c;
 }
 
-
-int cifs_mkdir(cifs_connect_p c, const char *pathname) {
-    return -1;
+int cifs_mkdir(cifs_connect_p c, const char *path) {
+    cifs_packet_setup(c->o, SMBmkdir, 0);
+    cifs_write_byte(c->o->b, '\x04');
+	if (c->capabilities & CAP_UNICODE) {
+        cifs_write_path_ucsz(c->o->b, path);
+	} else {
+        cifs_write_path_oemz(c->o->b, path);
+	}
+    if (cifs_request(c)) {
+        int e = errno;
+        cifs_stat_t st;
+        if (cifs_stat(c, path, &st)) {
+            errno = e;
+            return -1;
+        } else {
+            if (st.is_directory) {
+                errno = 0;
+                return 0;
+            } else {
+                errno = ENOTDIR;
+                return -1;
+            }
+        }
+    }
+    return 0;
 }
+
+int cifs_unlink(cifs_connect_p c, const char *path) {
+    cifs_packet_setup(c->o, SMBunlink, 2);
+    c->o->h->w[0] = 0x37;
+    cifs_write_byte(c->o->b, '\x04');
+	if (c->capabilities & CAP_UNICODE) {
+        cifs_write_path_ucsz(c->o->b, path);
+	} else {
+        cifs_write_path_oemz(c->o->b, path);
+	}
+    return cifs_request(c);
+}
+
+int cifs_rmdir(cifs_connect_p c, const char *path) {
+    cifs_packet_setup(c->o, SMBrmdir, 0);
+    cifs_write_byte(c->o->b, '\x04');
+	if (c->capabilities & CAP_UNICODE) {
+        cifs_write_path_ucsz(c->o->b, path);
+	} else {
+        cifs_write_path_oemz(c->o->b, path);
+	}
+    return cifs_request(c);
+}
+

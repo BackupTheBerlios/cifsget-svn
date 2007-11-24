@@ -40,7 +40,9 @@ typedef cifs_dirent_t *cifs_dirent_p;
 typedef struct cifs_dir_s cifs_dir_t;
 typedef cifs_dir_t *cifs_dir_p;
 
-cifs_dir_p cifs_opendir(cifs_connect_p c, const char *path, const char *mask);
+cifs_dir_p cifs_opendir(cifs_connect_p c, const char *path);
+
+cifs_dir_p cifs_mask(cifs_connect_p c, const char *path, const char *mask);
 
 cifs_dirent_p cifs_readdir(cifs_dir_p dir);
 
@@ -48,14 +50,16 @@ int cifs_closedir(cifs_dir_p dir);
 
 int cifs_stat(cifs_connect_p c, const char *path, cifs_stat_p st);
 
-int cifs_mkdir(cifs_connect_p c, const char *pathname);
+int cifs_mkdir(cifs_connect_p c, const char *path);
+int cifs_rmdir(cifs_connect_p c, const char *path);
 
 time_t cifs_time(int64_t nt_time);
 
 /* FILE */
 
-int cifs_open(cifs_connect_p c, const char *name, int flags, cifs_stat_p stat);
+int cifs_open(cifs_connect_p c, const char *path, int flags, cifs_stat_p stat);
 int cifs_close(cifs_connect_p c, int fid);
+int cifs_unlink(cifs_connect_p c, const char *path);
 
 size_t cifs_read(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t offset);
 size_t cifs_write(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t offset);

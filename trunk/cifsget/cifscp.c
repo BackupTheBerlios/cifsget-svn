@@ -85,7 +85,7 @@ int cifs_get_size_dir(cifs_connect_p c, const char *path, const char *name, uint
 		cifs_print_status("%6s %s", cifs_hsize(*size, NULL), name);
 	}
 
-	d = cifs_opendir(c, path, NULL);
+	d = cifs_opendir(c, path);
 	if (!d) return -1;
 	
 	while ((e = cifs_readdir(d))) {
@@ -119,7 +119,7 @@ int cifs_list_dir(cifs_connect_p c, const char *path) {
 	cifs_dir_p d;
 	uint64_t total = 0;
 
-	d = cifs_opendir(c, path, NULL);
+	d = cifs_opendir(c, path);
 	
 	if (!d) {
 		perror(path);
@@ -209,9 +209,9 @@ int cifs_list_uri(cifs_uri_p uri) {
 			perror(uri->tree);
 			return -1;
 		}
-		if (uri->path && uri->path[0]) {
+		if (uri->path[0]) {
 			if (!c) return -1;
-			dir = cifs_opendir(c, uri->dir, uri->file);
+			dir = cifs_mask(c, uri->dir, uri->file);
 			if (!dir) {
 				perror(uri->path);
 				cifs_connect_close(c);
@@ -317,7 +317,7 @@ int cifs_download_dir(cifs_connect_p c, const char *src, const char *dst) {
 	char *dname;
 	cifs_dir_p dir;
 	cifs_dirent_p ent;
-    dir = cifs_opendir(c, src, NULL);
+    dir = cifs_opendir(c, src);
 
 	if (dir == NULL) {
 		perror(src);
@@ -373,6 +373,7 @@ int cifs_upload_file(cifs_connect_p c, const char *src, const char *dst) {
 	}
 	
 	size = lseek(fd, 0, SEEK_END);
+    lseek(fd, 0, SEEK_SET);
 	if (size == (off_t)-1) {
 		perror(src);
 		goto err;
@@ -384,16 +385,16 @@ int cifs_upload_file(cifs_connect_p c, const char *src, const char *dst) {
 
 	char size_str[10];
 
-	cifs_hsize(off, size_str);
+	cifs_hsize(size, size_str);
 
     buf = malloc(64*1024);
 
 	while (rem > 0) {
 		len = rem;
-        if (len > sizeof(buf)) {
-            len = sizeof(buf);
+        if (len > 1024) {
+            len = 1024;
         }
-        len = read(fd, buf, len);
+        len = pread(fd, buf, len, off);
    		if (len < 0) {
 			perror(src);
 			goto err;
@@ -448,14 +449,19 @@ int cifs_upload_dir(cifs_connect_p c, const char *src, const char *dst) {
 	    return -1;
 	}
 	while ((ent = readdir(dir)) != NULL) {
+        if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) continue;
 		asprintf(&sname, "%s/%s", src, ent->d_name);
         asprintf(&dname, "%s/%s", dst, ent->d_name);
-        
-    	if (ent->d_type == DT_REG) {
-            cifs_download_file(c, sname, dname);
+        struct stat st;
+        if (stat(sname, &st)) {
+            perror(sname);
+            continue;
         }
-        if (ent->d_type == DT_DIR) {
-            cifs_download_dir(c, sname, dname);
+    	if (S_ISDIR(st.st_mode)) {
+            cifs_upload_dir(c, sname, dname);
+        }
+        if (S_ISREG(st.st_mode)) {
+            cifs_upload_file(c, sname, dname);
 		}
 		free(sname);
 		free(dname);
@@ -558,7 +564,7 @@ int main(int argc, char** argv) {
                 perror(src);
                 continue;
             }
-            dir = cifs_opendir(c, suri->dir, suri->file);
+            dir = cifs_mask(c, suri->dir, suri->file);
 			if (!dir) {
 				perror(src);
 				continue;
@@ -587,11 +593,15 @@ int main(int argc, char** argv) {
             perror(dst);
             return -1;
         }
-        cifs_stat_t st;
-        if (cifs_stat(c, duri->path, &st)) {
-            dst_dir = 0;
+        if (duri->path[0]) {
+            cifs_stat_t st;
+            if (cifs_stat(c, duri->path, &st)) {
+                dst_dir = 0;
+            } else {
+                dst_dir = st.is_directory;
+            }
         } else {
-            dst_dir = st.is_directory;
+            dst_dir = 1;
         }
         if (args > 2 && !dst_dir) {
             errno = ENOTDIR;
