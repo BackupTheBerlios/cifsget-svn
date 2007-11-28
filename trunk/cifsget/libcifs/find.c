@@ -70,7 +70,7 @@ static int cifs_find_next_req(cifs_connect_p c, int sid) {
     cifs_buf_p b = c->o->b;
     CIFS_WRITE_STRUCT(b, cifs_find_next_req_s, f);
     f->sid = sid;
-    f->search_count = -1;	
+    f->search_count = -1;
     f->information_level = SMB_FIND_DIRECTORY_INFO;
     f->resume_key = 0;
     f->flags = FLAG_TRANS2_FIND_CLOSE_IF_END | FLAG_TRANS2_FIND_CONTINUE;
@@ -206,5 +206,31 @@ int cifs_stat(cifs_connect_p c, const char *path, cifs_stat_p st) {
 	cifs_build_stat(di, st);
 	cifs_trans_free(tr);
 	return 0;
+}
+
+cifs_dirent_p *cifs_scandir(cifs_connect_p c, const char *path) {
+    cifs_dir_p dir;
+    cifs_dirent_p ent, tmp;
+    int size = 16, cnt = 0;
+    cifs_dirent_p *nl = NULL;
+	dir = cifs_opendir(c, path);
+	if (!dir) return NULL;
+    nl = calloc(size, sizeof(cifs_dirent_p));
+	while ((ent = cifs_readdir(dir))) {
+        if (cnt == size) {
+            size *= 2;
+            nl = realloc(nl, size * sizeof(cifs_dirent_p));
+        }
+        tmp = (cifs_dirent_p)malloc(sizeof(cifs_dirent_t) + strlen(ent->path) + 1);
+        memcpy(tmp, ent, sizeof(cifs_dirent_t));
+        strcpy(tmp->buf, ent->path);
+        tmp->path = tmp->buf;
+        tmp->name = tmp->path + (ent->name - ent->path);
+        nl[cnt++] = tmp;
+    }
+	cifs_closedir(dir);
+    nl = realloc(nl, (cnt + 1) * sizeof(cifs_dirent_p));
+    nl[cnt] = NULL;
+    return nl;
 }
 

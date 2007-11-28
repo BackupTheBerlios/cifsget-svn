@@ -34,6 +34,7 @@ typedef struct cifs_dirent_s {
 	cifs_stat_t st;
 	char *name;
 	char *path;
+    char buf[0];
 } cifs_dirent_t;
 typedef cifs_dirent_t *cifs_dirent_p;
 
@@ -54,6 +55,8 @@ int cifs_mkdir(cifs_connect_p c, const char *path);
 int cifs_rmdir(cifs_connect_p c, const char *path);
 
 time_t cifs_time(int64_t nt_time);
+
+cifs_dirent_p *cifs_scandir(cifs_connect_p c, const char *path);
 
 /* FILE */
 

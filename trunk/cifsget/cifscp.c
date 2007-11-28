@@ -14,6 +14,9 @@
 #include "flow.h"
 #include "human.h"
 
+cifs_flow_p flow;
+int opt_dirsize = 0, opt_list = 0, opt_recursive = 0;
+
 void usage() {
 	fprintf(stderr, "\
 usage: \n\
@@ -26,7 +29,8 @@ usage: \n\
   \n\
   OPTION:\n\
   -l                    list directory contents\n\
-  -u                    calculate directory size\n\
+  -L                    list with directory size\n\
+  -R                    recurcive list and copy\n\
   -s <int>[k|m|g|t]     limit download speed\n\
   -h                    show this message and exit\n\
   -d [0-6]              debug level, default - 3\n\
@@ -46,9 +50,6 @@ int cifs_print_status(const char *fmt, ...) {
 	len = res;
 	return res;
 }
-
-cifs_flow_p flow;
-int opt_dirsize = 0;
 
 /* LIST */
 
@@ -117,24 +118,47 @@ int cifs_list_dir(cifs_connect_p c, const char *path) {
 	cifs_dirent_p e;
 	cifs_dir_p d;
 	uint64_t total = 0;
-
-	d = cifs_opendir(c, path);
-	
-	if (!d) {
-		perror(path);
-		return -1;
-	}
-	
-	while ((e = cifs_readdir(d))) {
-		if (e->st.is_directory && opt_dirsize) {
-			cifs_calc_size(c, e);
-		}
-		cifs_print_file(e);
-		total += e->st.file_size;
-	}
-	cifs_closedir(d);
-	printf("total: %s\n", cifs_hsize(total, NULL));
+    if (opt_recursive) {
+        cifs_dirent_p *nl, *p;
+        nl = cifs_scandir(c, path);
+        if (nl == NULL) goto err;
+        printf("%s:\n", path);
+        for (p = nl ; *p ; p++) {
+            e = *p;
+            if (e->st.is_directory && opt_dirsize) {
+                cifs_calc_size(c, e);
+            }
+            cifs_print_file(e);
+            total += e->st.file_size;
+        }
+        printf("total: %s\n\n", cifs_hsize(total, NULL));
+        for (p = nl ; *p ; p++) {
+            e = *p;
+            if (e->st.is_directory) {
+                cifs_list_dir(c, e->path);
+            }
+            free(e);
+        }
+        free(nl);
+    } else {
+        d = cifs_opendir(c, path);
+        if (!d) goto err;
+        printf("%s:\n", path);
+        while ((e = cifs_readdir(d))) {
+            if (e->st.is_directory && opt_dirsize) {
+                cifs_calc_size(c, e);
+            }
+            cifs_print_file(e);
+            total += e->st.file_size;
+        }
+        cifs_closedir(d);
+        printf("total: %s\n\n", cifs_hsize(total, NULL));
+    }
 	return 0;
+err:
+    perror(path);
+    printf("\n");
+    return -1;
 }
 
 int cifs_list_node(cifs_connect_p c) {
@@ -180,63 +204,6 @@ int cifs_list_node(cifs_connect_p c) {
 	}
 	
 	cifs_tree_disconnect(c, 0);
-	return 0;
-}
-
-int cifs_list(cifs_connect_p c, cifs_dirent_p di) {
-	if (di) {
-		if (di->st.is_directory) {
-		    printf("%s:\n", di->name);
-			cifs_list_dir(c, di->path);
-			printf("\n");
-		} else {
-			cifs_print_file(di);
-		}
-	} else {
-		cifs_list_node(c);
-	}
-	return 0;
-}
-
-int cifs_list_uri(cifs_uri_p uri) {
-	cifs_connect_p c;
-	cifs_dir_p dir;
-	cifs_dirent_p de;
-	if (uri->tree) {
-		c = cifs_connect(uri->addr, uri->port, uri->host, uri->tree);
-		if (!c) {
-			perror(uri->tree);
-			return -1;
-		}
-		if (uri->path[0]) {
-			if (!c) return -1;
-			dir = cifs_mask(c, uri->dir, uri->file);
-			if (!dir) {
-				perror(uri->path);
-				cifs_connect_close(c);
-				return -1;
-			}
-			while ((de = cifs_readdir(dir))) {
-				cifs_list(c, de);				
-			}
-			cifs_closedir(dir);
-		} else {
-			cifs_dirent_t d;
-			ZERO_STRUCT(d);
-			d.st.is_directory = 1;
-			d.name = uri->tree;
-			d.path = "";
-			cifs_list(c, &d);
-		}
-	} else {
-		c = cifs_connect(uri->addr, uri->port, uri->host, NULL);
-		if (!c) {
-			perror(uri->host);
-			return -1;
-		}
-		cifs_list(c, NULL);
-	}
-	cifs_connect_close(c);	
 	return 0;
 }
 
@@ -469,16 +436,17 @@ int cifs_upload_dir(cifs_connect_p c, const char *src, const char *dst) {
     return 0;
 }
 
+/* MAIN */
+
 int is_directory(const char *path) {
     struct stat st;
     if (stat(path, &st)) return 0;
     return S_ISDIR(st.st_mode);
 }
 
-
 int main(int argc, char** argv) {
 	int opt, args;
-    int list = 0;
+    int opt_list = 0;
     cifs_uri_p suri, duri;
     char *dst, *src;
     int dst_dir = 0;
@@ -492,14 +460,14 @@ int main(int argc, char** argv) {
 	}
 
     if (!strcmp(argv[0], "cifsls")) {
-        list = 1;
+        opt_list = 1;
     }
     
 	flow = cifs_flow_new();
 
 	cifs_log_stream = stderr;
 
-    while ((opt = getopt(argc, argv, "hlus:d:")) != -1) {
+    while ((opt = getopt(argc, argv, "hlLRs:d:")) != -1) {
 		switch (opt) {
 			case 'd':
 				cifs_log_level = atoi(optarg);
@@ -508,9 +476,13 @@ int main(int argc, char** argv) {
 				flow->limit = cifs_decode_hsize(optarg);
 				break;
 			case 'l':
-                list = 1;
+                opt_list = 1;
 				break;
-			case 'u':
+            case 'R':
+                opt_recursive = 1;
+                break;
+			case 'L':
+                opt_list = 1;
 				opt_dirsize = 1;
 				break;
 			case '?':
@@ -521,16 +493,45 @@ int main(int argc, char** argv) {
     }
     args = argc - optind;
    
-    if (list) {
+    if (opt_list) {
         if (args <= 0) {
             usage();
             return 2;
         }
         for (int i = optind ; i < argc ; i++) {
-             suri = cifs_uri_parse(argv[i]);
-             if (suri->scheme == URI_CIFS) {
-                 cifs_list_uri(suri);
-             }
+            src = argv[i];
+            suri = cifs_uri_parse(src);
+            if (suri->scheme == URI_CIFS) {
+                c = cifs_connect(suri->addr, suri->port, suri->host, suri->tree);
+                if (!c) {
+                    perror(src);
+                    return -1;
+                }
+                if (suri->tree) {
+                    if (strpbrk(suri->file, "*?")) {
+                        dir = cifs_mask(c, suri->dir, suri->file);
+                        if (!dir) {
+                            perror(suri->path);
+                            cifs_connect_close(c);
+                            continue;
+                        }
+                        while ((ent = cifs_readdir(dir))) {
+                            if (ent->st.is_directory) {
+                                cifs_list_dir(c, ent->path);
+                            } else {
+                                cifs_print_file(ent);
+                            }
+                        }
+                        cifs_closedir(dir);
+                    } else {
+                        cifs_list_dir(c, suri->path);
+                    }
+                } else {
+                    cifs_list_node(c);
+                }
+                cifs_connect_close(c);
+            }
+            cifs_uri_free(suri);
         }
         return 0;
     }
@@ -558,6 +559,9 @@ int main(int argc, char** argv) {
         for (int i = optind ; i < argc-1; i++) {
             src = argv[i];
             suri = cifs_uri_parse(src);
+            if (suri->scheme != URI_CIFS) {
+                continue;
+            }
             c = cifs_connect(suri->addr, suri->port, suri->host, suri->tree);
             if (!c) {
                 perror(src);
@@ -576,7 +580,11 @@ int main(int argc, char** argv) {
                     dname = dst;
                 }
                 if (ent->st.is_directory) {
-                    cifs_download_dir(c, ent->path, dname);
+                    if (opt_recursive) {
+                        cifs_download_dir(c, ent->path, dname);
+                    } else {
+                        printf("cifscp: omitting directory %s\n", src);
+                    }
                 } else {
                     cifs_download_file(c, ent->path, dname);
                 }
@@ -610,6 +618,9 @@ int main(int argc, char** argv) {
         for (int i = optind ; i < argc-1; i++) {
             src = argv[i];
             suri = cifs_uri_parse(src);
+            if (suri->scheme != URI_FILE) {
+                continue;
+            }
             char *dname;
             if (dst_dir) {
                 asprintf(&dname, "%s/%s", duri->path, suri->file);
@@ -617,7 +628,11 @@ int main(int argc, char** argv) {
                 dname = duri->path;
             }
             if (is_directory(src)) {
-                cifs_upload_dir(c, src, dname);
+                if (opt_recursive) {
+                    cifs_upload_dir(c, src, dname);
+                } else {
+                    printf("cifscp: omitting directory %s\n", src);
+                }
             } else {
                 cifs_upload_file(c, src, dname);
             }

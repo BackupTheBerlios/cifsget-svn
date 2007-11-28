@@ -1,5 +1,6 @@
 CFLAGS=-g -std=c99 -Wall -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
-LDFLAGS=-Llibcifs
+LDFLAGS=
+SRCS=cifscp.c flow.c human.c uri.c cifs_spider.c
 PREFIX=${HOME}
 
 all: libs cifscp
@@ -14,13 +15,13 @@ install: all
 	${CC} ${CFLAGS} -c -o $@ $<
 
 cifscp: cifscp.o flow.o human.o uri.o libcifs/libcifs.a
-	$(CC) -o $@ $^ -lcifs $(LDFLAGS)
+	$(CC) $(LDFLAGS) -o $@ $^
 	
 cifs_spider: cifs_spider.o uri.o libcifs/libcifs.a
-	$(CC) -o $@ $^ -lcifs $(LDFLAGS)
+	$(CC) $(LDFLAGS) -o $@ $^
 
-fusecifs: fusecifs.o
-	${CC} -o $@ $^ -lfuse -lcifs ${LDFLAGS}
+fusecifs: fusecifs.o libcifs/libcifs.a
+	${CC} ${LDFLAGS} -o $@ $^
 
 clean:
 	rm -f *.o cifsmirror cifscp tags fusecifs

@@ -20,7 +20,7 @@ int cifs_packet_parse(cifs_packet_p packet) {
     wc = packet->h->wc;
     if (size < sizeof(struct cifs_header_s) + wc*2) return -1;
     bc = packet->h->w[wc];
-	if (size != sizeof(struct cifs_header_s) + wc*2 + bc) return -1;
+	if (size < sizeof(struct cifs_header_s) + wc*2 + bc) return -1;
     cifs_buf_setup(packet->b, (char *)(packet->h->w + wc + 1), bc);
 	return 0;
 }

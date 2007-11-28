@@ -9,7 +9,8 @@ struct cifs_enum_s {
 	int conv;
 };
 
-static void cifs_rap_begin(cifs_connect_p c, int rap_code, const char *param_dest, const char* data_desc, int info_level) {
+static int cifs_rap_begin(cifs_connect_p c, int rap_code, const char *param_dest, const char* data_desc, int info_level) {
+ 	if (cifs_tree_ipc(c)) return -1;
 	cifs_trans_req(c, SMBtrans, "\\PIPE\\LANMAN", 0);
     cifs_buf_p b = c->o->b;
     cifs_write_word(b, rap_code);
@@ -17,6 +18,7 @@ static void cifs_rap_begin(cifs_connect_p c, int rap_code, const char *param_des
 	cifs_write_strz(b, data_desc);
 	cifs_write_word(b, info_level);
 	cifs_write_word(b, CIFS_TRANS_MAX_DATA_COUNT);
+    return 0;
 }
 
 static void cifs_rap_end(cifs_connect_p c) {
@@ -26,27 +28,19 @@ static void cifs_rap_end(cifs_connect_p c) {
 
 static cifs_enum_p cifs_rap_enum(cifs_connect_p c, int type) {
 	cifs_enum_p e;
-	
 	NEW_STRUCT(e);
-	if (!e)	goto err;	
+	if (!e)	goto err;
     e->t = cifs_trans_new();
 	if (e->t == NULL) goto err;
-	
 	e->c = c;
-
-	if (cifs_tree_ipc(c)) goto err;
 	if (cifs_trans_request(c, e->t)) goto err;
     cifs_tree_set(c, -1);
-
 	cifs_log_trans("rapenum", e->t);
-
-    CIFS_READ_STRUCT(e->t->param, cifs_rapenum_s, re);
-	
+    CIFS_READ_STRUCT(e->t->param, cifs_rapenum_s, re);	
 	if (re->status) {
 		errno = EIO;
 		goto err;
-	}
-	
+	}	
 	e->buf = e->t->data;
 	e->count = re->entry_count;
 	e->conv = re->convert;
@@ -55,20 +49,21 @@ static cifs_enum_p cifs_rap_enum(cifs_connect_p c, int type) {
 	return e;
 	
 err:
+    cifs_tree_set(c, -1);
 	cifs_trans_free(e->t);
 	FREE_STRUCT(e);
 	return NULL;
 }
 
 cifs_enum_p cifs_enum_share(cifs_connect_p c) {
-    cifs_rap_begin(c, 0, "WrLeh", "B13BWz", 1);
+    if (cifs_rap_begin(c, 0, "WrLeh", "B13BWz", 1)) return NULL;
     cifs_rap_end(c);
     return cifs_rap_enum(c, CIFS_NODE_SHARE);
 }
 
 
 cifs_enum_p cifs_enum_server(cifs_connect_p c, const char *domain) {
-	cifs_rap_begin(c, 104, "WrLehDz", "B16BBDz", 1);
+	if (cifs_rap_begin(c, 104, "WrLehDz", "B16BBDz", 1)) return NULL;
     cifs_write_long(c->o->b, -1);
 	cifs_write_strz(c->o->b, domain);
 	cifs_rap_end(c);
@@ -77,7 +72,7 @@ cifs_enum_p cifs_enum_server(cifs_connect_p c, const char *domain) {
 
 
 cifs_enum_p cifs_enum_domain(cifs_connect_p c) {
-	cifs_rap_begin(c, 104, "WrLehDz", "B16BBDz", 1);
+	if (cifs_rap_begin(c, 104, "WrLehDz", "B16BBDz", 1)) return NULL;
     cifs_write_long(c->o->b, 0x80000000);
     cifs_write_byte(c->o->b, 0);
 	cifs_rap_end(c);
