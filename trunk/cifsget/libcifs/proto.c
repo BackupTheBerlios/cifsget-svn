@@ -320,7 +320,7 @@ int cifs_write_andx_send(cifs_connect_p c) {
     return cifs_send(c);
 }
 
-size_t cifs_write_andx(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t offset) {
+size_t cifs_write_andx(cifs_connect_p c, int fid, const void *buf, size_t count, uint64_t offset) {
     CALL_SETUP(SMBwriteX, writex, 0);
 
     if (count > c->max_buffer_size) count = c->max_buffer_size; //FIXME
@@ -337,7 +337,7 @@ size_t cifs_write_andx(cifs_connect_p c, int fid, void *buf, size_t count, uint6
     return res->count;
 }
 
-size_t cifs_write(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t offset) {
+size_t cifs_write(cifs_connect_p c, int fid, const void *buf, size_t count, uint64_t offset) {
     return cifs_write_andx(c, fid, buf, count, offset);
 }
 

@@ -65,7 +65,7 @@ int cifs_close(cifs_connect_p c, int fid);
 int cifs_unlink(cifs_connect_p c, const char *path);
 
 size_t cifs_read(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t offset);
-size_t cifs_write(cifs_connect_p c, int fid, void *buf, size_t count, uint64_t offset);
+size_t cifs_write(cifs_connect_p c, int fid, const void *buf, size_t count, uint64_t offset);
 
 /* RAP */
 
