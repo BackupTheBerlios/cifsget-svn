@@ -68,13 +68,13 @@ int cifs_trans_recv(cifs_connect_p c, cifs_trans_p t) {
     int dis, off, cnt;
     WORDS_STRUCT(c->i, cifs_transaction_second_res_s, res);
 
-    cifs_buf_limit(t->setup, -1);
-    cifs_buf_limit(t->param, -1);
-    cifs_buf_limit(t->data, -1);
+    cifs_buf_resize(t->setup, -1);
+    cifs_buf_resize(t->param, -1);
+    cifs_buf_resize(t->data, -1);
 
-    cifs_buf_reset(t->setup);
-    cifs_buf_reset(t->param);
-    cifs_buf_reset(t->data);
+    cifs_buf_set(t->setup, 0);
+    cifs_buf_set(t->param, 0);
+    cifs_buf_set(t->data, 0);
 
 	if(cifs_recv(c)) return -1;
 
@@ -85,10 +85,10 @@ int cifs_trans_recv(cifs_connect_p c, cifs_trans_p t) {
                 || res->total_param_count > cifs_buf_size(t->param) 
                 || res->total_data_count > cifs_buf_size(t->data)) goto err;
         
-        cifs_buf_limit(t->setup, res->setup_count * 2);
+        cifs_buf_resize(t->setup, res->setup_count * 2);
         cifs_write_buf(t->setup, res->setup, res->setup_count * 2);
-        cifs_buf_limit(t->param, res->total_param_count);
-		cifs_buf_limit(t->data, res->total_data_count);
+        cifs_buf_resize(t->param, res->total_param_count);
+		cifs_buf_resize(t->data, res->total_data_count);
 
         if (res->param_count) {
             cnt = res->param_count;
@@ -107,13 +107,13 @@ int cifs_trans_recv(cifs_connect_p c, cifs_trans_p t) {
             cifs_buf_set(t->data, dis);
             cifs_write_buf(t->data,  cifs_packet_ptr(c->i, off), cnt);
 		}		
-		if (cifs_buf_end(t->param) && cifs_buf_end(t->data)) break;
+		if (cifs_buf_left(t->param) == 0 && cifs_buf_left(t->data) == 0) break;
 		
 		if(cifs_recv(c)) return -1;
 	} while(1);
-    cifs_buf_reset(t->setup);
-    cifs_buf_reset(t->param);
-    cifs_buf_reset(t->data);
+    cifs_buf_set(t->setup, 0);
+    cifs_buf_set(t->param, 0);
+    cifs_buf_set(t->data, 0);
 	return 0;
 err:
     cifs_log_error("incorrect transaction\n");

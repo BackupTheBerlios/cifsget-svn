@@ -26,8 +26,8 @@ int cifs_packet_parse(cifs_packet_p packet) {
 }
 
 int cifs_packet_unparse(cifs_packet_p packet) {
-    packet->b->l = packet->b->p;
-    packet->p->l = packet->b->p;
+    packet->b->e = packet->b->p;
+    packet->p->e = packet->b->p;
     int size = cifs_buf_size(packet->p) - 4;
     packet->h->nbt.length[1] = size;
     packet->h->nbt.length[0] = size>>8;
@@ -40,7 +40,7 @@ int cifs_packet_length(cifs_packet_p packet) {
 }
 
 void cifs_packet_setup(cifs_packet_p packet, int cmd, int words_size) {
-    cifs_buf_limit(packet->p, -1);
+    cifs_buf_resize(packet->p, -1);
     packet->h->cmd = cmd;
     int wc = (words_size + 1) / 2;
     packet->h->wc = wc;
@@ -329,8 +329,8 @@ int cifs_recv(cifs_connect_p c) {
 
     cifs_buf_p buf = c->i->p;
 
-    cifs_buf_limit(buf, 4);
-    cifs_buf_reset(buf);
+    cifs_buf_resize(buf, 4);
+    cifs_buf_set(buf, 0);
     	
 	do {
 		res = recv(c->sock, cifs_buf_cur(buf), cifs_buf_left(buf), MSG_WAITALL);
@@ -341,10 +341,10 @@ int cifs_recv(cifs_connect_p c) {
 			if (c->i->h->nbt.type) {
                 // FIXME: call special callback
 				cifs_recv_skip(c, size);
-                cifs_buf_reset(buf);
+                cifs_buf_set(buf, 0);
 			} else {
                 size += 4;
-				if (cifs_buf_limit(buf, size)) {
+				if (cifs_buf_resize(buf, size)) {
 					cifs_log_error("cifs_recv: buffer to small: need %d bytes\n", size);
 					errno = ENOMEM;
 					return -1;
@@ -391,8 +391,8 @@ int cifs_recv_async(cifs_connect_p c) {
     cifs_buf_p buf = c->i->p;
 	
 	if (cifs_buf_left(buf) == 0) {
-        cifs_buf_limit(buf, 4);
-        cifs_buf_reset(buf);
+        cifs_buf_resize(buf, 4);
+        cifs_buf_set(buf, 0);
 	}
 
     size = recv(c->sock, cifs_buf_cur(buf), cifs_buf_left(buf), MSG_DONTWAIT);
@@ -404,7 +404,7 @@ int cifs_recv_async(cifs_connect_p c) {
         if (cifs_buf_len(buf) == 4) {
             /* size done */
             size = cifs_packet_length(c->i) + 4;
-			if (cifs_buf_limit(buf, size)) {
+			if (cifs_buf_resize(buf, size)) {
 				cifs_log_error("cifs_recv_async: buffer to small for %d bytes packet\n", size);
 				errno = ENOMEM;
 				return -1;

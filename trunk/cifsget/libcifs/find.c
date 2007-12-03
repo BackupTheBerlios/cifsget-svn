@@ -29,17 +29,19 @@ static void cifs_build_stat(struct cifs_find_dirinfo_s *di, cifs_stat_p st) {
 static void cifs_build_dirent(cifs_connect_p c, struct cifs_find_dirinfo_s *di, cifs_dirent_p de) {
 	cifs_build_stat(di, &de->st);
 	if (c->capabilities & CAP_UNICODE) {
-		cifs_cp_block(cifs_cp_ucs_to_sys, de->name, NAME_MAX, di->name, di->name_length);
+		cifs_cp_buf(cifs_cp_ucs_to_sys, de->name, NAME_MAX, di->name, di->name_length);
 	} else {
-		cifs_cp_block(cifs_cp_oem_to_sys, de->name, NAME_MAX, di->name, di->name_length);
+		cifs_cp_buf(cifs_cp_oem_to_sys, de->name, NAME_MAX, di->name, di->name_length);
 	}
 }
 
 static int cifs_find_first_req(cifs_connect_p c, const char *path, const char *mask) {
 	cifs_trans_req(c, SMBtrans2, NULL, 1, TRANSACT2_FINDFIRST);
     cifs_buf_p b = c->o->b;
-    CIFS_WRITE_STRUCT(b, cifs_find_first_req_s, f);
     
+    struct cifs_find_first_req_s *f= cifs_buf_cur(b);
+    cifs_buf_inc(b, sizeof(*f));
+
     f->search_attributes = 0x37;
     f->search_count = -1;
     f->flags = FLAG_TRANS2_FIND_CLOSE_IF_END;
@@ -68,7 +70,8 @@ static int cifs_find_first_req(cifs_connect_p c, const char *path, const char *m
 static int cifs_find_next_req(cifs_connect_p c, int sid) {
     cifs_trans_req(c, SMBtrans2, NULL, 1, TRANSACT2_FINDNEXT);
     cifs_buf_p b = c->o->b;
-    CIFS_WRITE_STRUCT(b, cifs_find_next_req_s, f);
+    struct cifs_find_next_req_s *f = cifs_buf_cur(b);
+    cifs_buf_inc(b, sizeof(*f));
     f->sid = sid;
     f->search_count = -1;
     f->information_level = SMB_FIND_DIRECTORY_INFO;
@@ -111,9 +114,9 @@ cifs_dir_p cifs_mask(cifs_connect_p c, const char *path, const char *mask) {
 	}
 
 	cifs_log_trans("findfirst", d->t);
-    
-    CIFS_READ_STRUCT(d->t->param, cifs_find_first_res_s, ff);
-    
+
+    struct cifs_find_first_res_s *ff = cifs_buf_cur(d->t->param);
+        
 	d->end = ff->end_of_search;
 	d->sid = ff->sid;
 	d->buf = d->t->data;
@@ -147,7 +150,7 @@ loop:
 
 		cifs_log_trans("findnext", f->t);
 
-        CIFS_READ_STRUCT(f->t->param, cifs_find_next_res_s, fn);
+        struct cifs_find_next_res_s *fn = cifs_buf_cur(f->t->param);
 
 		f->end = fn->end_of_search;
 		f->count = fn->search_count;
@@ -158,7 +161,7 @@ loop:
 			return NULL;
 		}
 	}
-    CIFS_BUF_STRUCT(f->buf, cifs_find_dirinfo_s, di);
+    struct cifs_find_dirinfo_s *di = cifs_buf_cur(f->buf);
 	cifs_build_dirent(f->c, di, &f->de);
     cifs_buf_inc(f->buf, di->next_entry_offset);
 	f->count--;
@@ -191,8 +194,7 @@ int cifs_stat(cifs_connect_p c, const char *path, cifs_stat_p st) {
 	}
 	cifs_log_trans("stat", tr);
 
-    CIFS_READ_STRUCT(tr->param, cifs_find_first_res_s, ff);
-   
+    struct cifs_find_first_res_s *ff = cifs_buf_cur(tr->param);
 	if (ff->search_count != 1) {
 		if (!ff->end_of_search) {
 			cifs_find_close_req(c, ff->sid);
@@ -202,7 +204,7 @@ int cifs_stat(cifs_connect_p c, const char *path, cifs_stat_p st) {
 		errno = EMLINK;
 		return -1;
 	}
-    CIFS_READ_STRUCT(tr->data, cifs_find_dirinfo_s, di);    
+    struct cifs_find_dirinfo_s *di = cifs_buf_cur(tr->data);
 	cifs_build_stat(di, st);
 	cifs_trans_free(tr);
 	return 0;

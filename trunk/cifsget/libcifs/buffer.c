@@ -3,10 +3,10 @@
 cifs_buf_p cifs_buf_new(int size) {
     cifs_buf_p buf = (cifs_buf_p)malloc(sizeof(cifs_buf_t) + size);
     if (size) {
-        buf->b = buf->buf;
-        buf->l = buf->b + size;
+        buf->b = buf->buf;        
+        buf->x = buf->b + size;
         buf->p = buf->b;
-        buf->s = size;
+        buf->e = buf->x;
     } else {
         ZERO_STRUCTP(buf);
     }
@@ -19,21 +19,24 @@ void cifs_buf_free(cifs_buf_p buf) {
 
 void cifs_buf_setup(cifs_buf_p buf, char *begin, int size) {
     buf->b = begin;
-    buf->l = buf->b + size;
+    buf->e = buf->b + size;
     buf->p = buf->b;
-    buf->s = size;
+    buf->x = buf->b + size;
 }
 
-int cifs_buf_limit(cifs_buf_p buf, int size) {
-    if (size < 0) size = buf->s;
-    if (size > buf->s) return -1;
-    buf->l = buf->b + size;
+int cifs_buf_resize(cifs_buf_p buf, int size) {
+    if (size < 0) {
+        buf->e = buf->x;
+    } else {
+        if (size > buf->x - buf->b) return -1;
+        buf->e = buf->b + size;
+    }
     return 0;
 }
 
 int cifs_write_oem(cifs_buf_p dst, const char *src) {
     int res;
-    res = cifs_cp_block(cifs_cp_sys_to_oem, cifs_buf_cur(dst), cifs_buf_left(dst), src, strlen(src));
+    res = cifs_cp_buf(cifs_cp_sys_to_oem, cifs_buf_cur(dst), cifs_buf_left(dst), src, strlen(src));
     if (res < 0) {
         cifs_log_error("iconv error\n");
         return 0;
@@ -44,7 +47,7 @@ int cifs_write_oem(cifs_buf_p dst, const char *src) {
 
 int cifs_write_ucs(cifs_buf_p dst, const char *src) {
     int res;
-    res = cifs_cp_block(cifs_cp_sys_to_ucs, cifs_buf_cur(dst), cifs_buf_left(dst), src, strlen(src));
+    res = cifs_cp_buf(cifs_cp_sys_to_ucs, cifs_buf_cur(dst), cifs_buf_left(dst), src, strlen(src));
     if (res < 0) {
         cifs_log_error("iconv error\n");
         return 0;

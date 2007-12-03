@@ -57,26 +57,6 @@ void cifs_print_file(cifs_dirent_p st) {
 	printf("%6s %s%s\n", (!st->st.is_directory || opt_dirsize) ? cifs_hsize(st->st.file_size, NULL) : " <dir>" , st->name, st->st.is_directory ? "/":"");
 }
 
-int cifs_print_node(cifs_node_p n) {
-	char *type;
-	switch (n->type) {
-		case CIFS_NODE_SHARE:
-			type = "<shr>";
-			break;
-		case CIFS_NODE_SERVER:
-			type = "<srv>";
-			break;
-		case CIFS_NODE_DOMAIN:
-			type = "<dom>";
-			break;	
-		default:
-			type = "<unk>";
-			break;		
-	}
-	printf(" %s %s\t%s\n", type, n->name, n->comment);
-	return 0;
-}
-
 int cifs_get_size_dir(cifs_connect_p c, const char *path, const char *name, uint64_t *size) {
 	cifs_dir_p d;
 	cifs_dirent_p e;
@@ -161,49 +141,60 @@ err:
     return -1;
 }
 
-int cifs_list_node(cifs_connect_p c) {
-	cifs_enum_p e;
-	cifs_node_t n;
+int cifs_print_node(cifs_node_p n) {
+	char *type;
+	switch (n->type) {
+		case CIFS_NODE_SHARE:
+			type = "<shr>";
+			break;
+		case CIFS_NODE_SERVER:
+			type = "<srv>";
+			break;
+		case CIFS_NODE_DOMAIN:
+			type = "<dom>";
+			break;
+		default:
+			type = "<unk>";
+			break;		
+	}
+	printf(" %s %s\t%s\n", type, n->name, n->comment);
+	return 0;
+}
 
-	if (!c) return -1;
-	
-	e = cifs_enum_domain(c);
-	if (e) {
-		int count = cifs_enum_count(e);
-		char **dom = calloc(count+1, sizeof(char*));
-		char **p = dom;	
-		
-		while (!cifs_enum_next(e, &n)) {
-			cifs_print_node(&n);
-			*p++ = strdup(n.name);
-		}
-		cifs_enum_close(e);
-		
-		printf("\n");
-		
-		for (p = dom ; *p ; p++) {
-			e = cifs_enum_server(c, *p);
-			if (e) {
-				printf("%s:\n", *p);
-				while (!cifs_enum_next(e, &n)) {
-					cifs_print_node(&n);
-				}
-				printf("\n");
-				cifs_enum_close(e);
-			}
-			free(*p);
-		}
-		free(dom);
-	}
-		
-	if ((e = cifs_enum_share(c))) {
-		while (!cifs_enum_next(e, &n)) {
-			cifs_print_node(&n);
-		}
-		cifs_enum_close(e);
-	}
-	
-	cifs_tree_disconnect(c, 0);
+int cifs_list_node(cifs_connect_p c) {
+    cifs_node_p *domains, *dom, *servers, *ser, *shares, *shr;
+    if ((domains = cifs_scannode(c, CIFS_NODE_DOMAIN, NULL))) {
+        for (dom = domains ; *dom ; dom++) {
+            cifs_print_node(*dom);
+        }
+        printf("\n");
+        for (dom = domains ; *dom ; dom++) {
+            printf("%s:\n", (*dom)->name);
+            if ((servers = cifs_scannode(c, CIFS_NODE_SERVER, (*dom)->name))) {
+                for (ser = servers ; *ser ; ser++) {
+                    cifs_print_node(*ser);
+                    free(*ser);
+                }
+                free(servers);
+            } else {
+                perror("list servers");
+            }            
+            free(*dom);
+            printf("\n");
+        }
+       free(domains);
+    } else {
+        perror("list domains");
+    }
+    if ((shares = cifs_scannode(c, CIFS_NODE_SHARE, NULL))) {
+        for (shr = shares ; *shr ; shr++) {
+            cifs_print_node(*shr);
+            free(*shr);
+        }
+        free(shares);
+    } else {
+        perror("list shares");
+    }
 	return 0;
 }
 
