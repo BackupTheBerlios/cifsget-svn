@@ -1,6 +1,6 @@
 #include "includes.h"
 
-int cifs_log_level = CIFS_LOG_NORMAL;
+int cifs_log_level = CIFS_LOG_WARNING;
 
 FILE *cifs_log_stream = NULL;
 

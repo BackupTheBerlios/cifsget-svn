@@ -26,7 +26,7 @@ int cifs_negotiate(cifs_connect_p c) {
 	c->time = cifs_time(res->time);
 	c->zone = res->zone * 60;
 
-    cifs_log_verbose("max buffer %d raw %d cap %lX \n", res->max_buffer_size, res->max_raw_size, res->capabilities);
+    cifs_log_debug("max buffer %d raw %d cap %lX \n", res->max_buffer_size, res->max_raw_size, res->capabilities);
     cifs_log_verbose("server time: UTC %+d %s\n", c->zone/3600, ctime(&c->time));
 
 	//c->capabilities &= !CAP_UNICODE;

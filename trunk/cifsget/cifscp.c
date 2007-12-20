@@ -33,7 +33,7 @@ usage: \n\
   -R                    recurcive list and copy\n\
   -s <int>[k|m|g|t]     limit download speed\n\
   -h                    show this message and exit\n\
-  -d [0-6]              debug level, default - 3\n\
+  -v                    increase verbosity\n\
 ");
 }
 
@@ -249,12 +249,12 @@ int cifs_download_file(cifs_connect_p c, const char *src, const char *dst) {
 		}
 		if (cifs_flow(flow, res) && cifs_log_level >= CIFS_LOG_NORMAL) {
 			char speed_str[10];
-			cifs_print_status("%6s of %6s (%.1f%%) %6s/s ETA: %s ", 
+			cifs_print_status("%6s of %6s (%.1f%%) %6s/s ETA: %s \t < %s", 
 					cifs_hsize(off, NULL), 
 					size_str,
 					(double)off * 100.0 / st.file_size, 
 					cifs_hsize(flow->speed, speed_str), 
-					flow->speed > 0 ? cifs_htime(rem / flow->speed) : "???");
+					flow->speed > 0 ? cifs_htime(rem / flow->speed) : "???", dst);
 		}
 	}
 	if (cifs_log_level >= CIFS_LOG_NORMAL) {
@@ -289,9 +289,7 @@ int cifs_download_dir(cifs_connect_p c, const char *src, const char *dst) {
 	
 	while ((ent = cifs_readdir(dir)) != NULL) {
 		asprintf(&dname, "%s/%s", dst, ent->name);
-		
-		cifs_print_file(ent);
-		
+	
 		if (ent->st.is_directory) {
 			if (cifs_download_dir(c, ent->path, dname)) {
 				perror(ent->path);
@@ -367,12 +365,12 @@ int cifs_upload_file(cifs_connect_p c, const char *src, const char *dst) {
 		}
 		if (cifs_flow(flow, res) && cifs_log_level >= CIFS_LOG_NORMAL) {
 			char speed_str[10];
-			cifs_print_status("%6s of %6s (%.1f%%) %6s/s ETA: %s ", 
+			cifs_print_status("%6s of %6s (%.1f%%) %6s/s ETA: %s \t > %s", 
 					cifs_hsize(off, NULL), 
 					size_str,
 					(double)off * 100.0 / size,
 					cifs_hsize(flow->speed, speed_str), 
-					flow->speed > 0 ? cifs_htime(rem / flow->speed) : "???");
+					flow->speed > 0 ? cifs_htime(rem / flow->speed) : "???", src);
 		}
 	}
 	if (cifs_log_level >= CIFS_LOG_NORMAL) {
@@ -458,10 +456,10 @@ int main(int argc, char** argv) {
 
 	cifs_log_stream = stderr;
 
-    while ((opt = getopt(argc, argv, "hlLRs:d:")) != -1) {
+    while ((opt = getopt(argc, argv, "hlLRvs:")) != -1) {
 		switch (opt) {
-			case 'd':
-				cifs_log_level = atoi(optarg);
+			case 'v':
+				cifs_log_level++;
 				break;
 			case 's':			
 				flow->limit = cifs_decode_hsize(optarg);
