@@ -345,9 +345,10 @@ int cifs_upload_file(cifs_connect_p c, const char *src, const char *dst) {
     buf = malloc(64*1024);
 
 	while (rem > 0) {
-		len = rem;
-        if (len > 1024) {
-            len = 1024;
+        if (rem > 60*1024) {
+            len = 60*1024;
+        } else {
+            len = rem;
         }
         len = pread(fd, buf, len, off);
    		if (len < 0) {
